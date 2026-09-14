@@ -1,0 +1,22 @@
+{
+  "name": "sabotage-canvas",
+  "version": "1.0.0",
+  "description": "Multiplayer drawing deception game with Socket.io",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "multiplayer",
+    "canvas",
+    "socket.io",
+    "game"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
