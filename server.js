@@ -3,580 +3,595 @@ const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 
+const PORT = process.env.PORT || 3000;
+const MIN_PLAYERS = 3;
+const DRAW_TURN_MS = 3000;
+const VOTING_MS = 30000;
+const SHOWDOWN_MS = 15000;
+const COLORS = ['#06b6d4', '#f43f5e', '#10b981', '#f59e0b', '#a855f7', '#22d3ee', '#fb7185', '#34d399'];
+
+const WORD_BANK = [
+  { category: 'Tiere', word: 'Giraffe' },
+  { category: 'Tiere', word: 'Pinguin' },
+  { category: 'Tiere', word: 'Delfin' },
+  { category: 'Tiere', word: 'Fuchs' },
+  { category: 'Tiere', word: 'Chamäleon' },
+  { category: 'Fahrzeuge', word: 'Bagger' },
+  { category: 'Fahrzeuge', word: 'Heißluftballon' },
+  { category: 'Fahrzeuge', word: 'U-Boot' },
+  { category: 'Fahrzeuge', word: 'Motorrad' },
+  { category: 'Fahrzeuge', word: 'Traktor' },
+  { category: 'Essen', word: 'Sushi' },
+  { category: 'Essen', word: 'Brezel' },
+  { category: 'Essen', word: 'Croissant' },
+  { category: 'Essen', word: 'Wassermelone' },
+  { category: 'Essen', word: 'Taco' },
+  { category: 'Berufe', word: 'Astronaut' },
+  { category: 'Berufe', word: 'Zauberer' },
+  { category: 'Berufe', word: 'Feuerwehrmann' },
+  { category: 'Berufe', word: 'Detektiv' },
+  { category: 'Berufe', word: 'Koch' },
+  { category: 'Orte', word: 'Leuchtturm' },
+  { category: 'Orte', word: 'Vulkan' },
+  { category: 'Orte', word: 'Burg' },
+  { category: 'Orte', word: 'Aquarium' },
+  { category: 'Orte', word: 'Wüste' },
+  { category: 'Objekte', word: 'Regenschirm' },
+  { category: 'Objekte', word: 'Kompass' },
+  { category: 'Objekte', word: 'Schneekugel' },
+  { category: 'Objekte', word: 'Stethoskop' },
+  { category: 'Objekte', word: 'Fernrohr' }
+];
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const PORT = process.env.PORT || 3000;
-const MIN_PLAYERS = 3;
-const TURN_MS = 3000;
-const VOTING_MS = 30000;
-const GUESS_MS = 15000;
-const TOTAL_ROUNDS = 2;
-
-const COLOR_PALETTE = ['#06b6d4', '#f43f5e', '#10b981', '#f59e0b', '#a855f7', '#22d3ee', '#fb7185', '#34d399'];
-
-const WORD_POOL = [
-  { category: 'Tiere', word: 'Giraffe' },
-  { category: 'Tiere', word: 'Delfin' },
-  { category: 'Tiere', word: 'Eule' },
-  { category: 'Tiere', word: 'Chamäleon' },
-  { category: 'Tiere', word: 'Pinguin' },
-  { category: 'Fahrzeuge', word: 'Bagger' },
-  { category: 'Fahrzeuge', word: 'U-Boot' },
-  { category: 'Fahrzeuge', word: 'Heißluftballon' },
-  { category: 'Fahrzeuge', word: 'Rakete' },
-  { category: 'Fahrzeuge', word: 'Feuerwehrauto' },
-  { category: 'Essen', word: 'Sushi' },
-  { category: 'Essen', word: 'Burger' },
-  { category: 'Essen', word: 'Brezel' },
-  { category: 'Essen', word: 'Croissant' },
-  { category: 'Essen', word: 'Taco' },
-  { category: 'Berufe', word: 'Astronaut' },
-  { category: 'Berufe', word: 'Detektiv' },
-  { category: 'Berufe', word: 'Koch' },
-  { category: 'Berufe', word: 'Pilot' },
-  { category: 'Berufe', word: 'Feuerwehrmann' },
-  { category: 'Orte', word: 'Leuchtturm' },
-  { category: 'Orte', word: 'Pyramide' },
-  { category: 'Orte', word: 'Skigebiet' },
-  { category: 'Orte', word: 'Bibliothek' },
-  { category: 'Orte', word: 'Aquarium' },
-  { category: 'Objekte', word: 'Kompass' },
-  { category: 'Objekte', word: 'Regenschirm' },
-  { category: 'Objekte', word: 'Sanduhr' },
-  { category: 'Objekte', word: 'Teleskop' },
-  { category: 'Objekte', word: 'Schlüssel' }
-];
-
 const rooms = new Map();
+const playerRoom = new Map();
 
-function makeCode() {
+function sanitizeNickname(input) {
+  const value = String(input || '').trim().replace(/\s+/g, ' ');
+  if (!value) return null;
+  return value.slice(0, 20);
+}
+
+function normalizeGuess(input) {
+  return String(input || '')
+    .trim()
+    .toLocaleLowerCase('de-DE')
+    .replace(/\s+/g, ' ');
+}
+
+function randomInt(max) {
+  return Math.floor(Math.random() * max);
+}
+
+function createRoomCode() {
   let code;
   do {
-    code = String(Math.floor(1000 + Math.random() * 9000));
+    code = String(randomInt(10000)).padStart(4, '0');
   } while (rooms.has(code));
   return code;
 }
 
-function sanitizeNickname(name) {
-  return String(name || '')
-    .replace(/\s+/g, ' ')
-    .replace(/[^\p{L}\p{N}_\- ]/gu, '')
-    .trim()
-    .slice(0, 18);
+function clearTimers(room) {
+  if (room.drawTimer) clearTimeout(room.drawTimer);
+  if (room.voteTimer) clearTimeout(room.voteTimer);
+  if (room.showdownTimer) clearTimeout(room.showdownTimer);
+  room.drawTimer = null;
+  room.voteTimer = null;
+  room.showdownTimer = null;
 }
 
-function createRoom(code, hostId) {
+function baseRoomState(room) {
   return {
-    code,
-    hostId,
-    phase: 'lobby',
-    players: [],
-    usedWords: new Set(),
-    secret: null,
-    imposterId: null,
-    turnIndex: 0,
-    turnTimerStarted: false,
-    votes: {},
-    replayEvents: [],
-    playAgainVotes: new Set(),
-    timeouts: { turn: null, voting: null, guessing: null },
-    revealed: false
+    roomCode: room.code,
+    phase: room.phase,
+    minPlayers: MIN_PLAYERS,
+    hostId: room.hostId,
+    roundNumber: room.roundNumber,
+    activePlayerId: room.activePlayerId,
+    turnEndsAt: room.turnEndsAt,
+    turnStartedAt: room.turnStartedAt,
+    voteEndsAt: room.voteEndsAt,
+    showdownEndsAt: room.showdownEndsAt,
+    players: room.players.map((p) => ({
+      id: p.id,
+      nickname: p.nickname,
+      color: p.color,
+      score: p.score,
+      isHost: p.id === room.hostId
+    })),
+    drawingLegend: room.players.map((p) => ({
+      id: p.id,
+      nickname: p.nickname,
+      color: p.color
+    })),
+    voteCounts: Object.entries(room.voteCounts || {}).map(([targetId, count]) => ({ targetId, count })),
+    votesSubmitted: Object.keys(room.votes || {}).length,
+    totalVotesExpected: room.players.length,
+    result: room.result || null
   };
 }
 
-function clearTimers(room) {
-  Object.keys(room.timeouts).forEach((key) => {
-    if (room.timeouts[key]) {
-      clearTimeout(room.timeouts[key]);
-      room.timeouts[key] = null;
-    }
-  });
-}
-
-function getPublicPlayers(room, revealRoles = false) {
-  return room.players.map((p) => ({
-    id: p.id,
-    nickname: p.nickname,
-    color: p.color,
-    score: p.score,
-    isHost: room.hostId === p.id,
-    role: revealRoles ? p.role : null,
-    connected: true
-  }));
+function emitRoleInfo(room) {
+  for (const player of room.players) {
+    const socket = io.sockets.sockets.get(player.id);
+    if (!socket) continue;
+    const payload = {
+      phase: room.phase,
+      category: room.category || null,
+      isImposter: player.id === room.imposterId,
+      word: player.id === room.imposterId ? null : room.word || null,
+      warning: player.id === room.imposterId && room.phase !== 'lobby' ? 'DU BIST DER IMPOSTER!' : null
+    };
+    socket.emit('roleInfo', payload);
+  }
 }
 
 function emitRoomState(room) {
-  io.to(room.code).emit('room_state', {
-    code: room.code,
-    phase: room.phase,
-    minPlayers: MIN_PLAYERS,
-    players: getPublicPlayers(room, room.revealed),
-    playAgainVotes: room.playAgainVotes.size,
-    replayEvents: room.replayEvents
-  });
+  io.to(room.code).emit('roomState', baseRoomState(room));
+  emitRoleInfo(room);
 }
 
-function getTurnContext(room) {
-  const totalTurns = room.players.length * TOTAL_ROUNDS;
-  return {
-    totalTurns,
-    currentTurn: room.turnIndex + 1,
-    round: Math.floor(room.turnIndex / room.players.length) + 1,
-    turnInRound: (room.turnIndex % room.players.length) + 1
-  };
+function findRoomBySocketId(socketId) {
+  const roomCode = playerRoom.get(socketId);
+  if (!roomCode) return null;
+  return rooms.get(roomCode) || null;
 }
 
-function emitTimer(room, durationMs, label, kind) {
-  const endAt = Date.now() + durationMs;
-  io.to(room.code).emit('timer_started', { durationMs, endAt, label, kind });
-}
-
-function beginTurn(room) {
-  if (room.players.length < MIN_PLAYERS) {
-    room.phase = 'lobby';
-    room.revealed = false;
-    emitRoomState(room);
-    return;
+function recalcVoteCounts(room) {
+  const counts = {};
+  for (const targetId of Object.values(room.votes || {})) {
+    counts[targetId] = (counts[targetId] || 0) + 1;
   }
+  room.voteCounts = counts;
+}
 
-  if (room.turnIndex >= room.players.length * TOTAL_ROUNDS) {
-    startVoting(room);
-    return;
-  }
+function assignRoundSecrets(room) {
+  const chosen = WORD_BANK[randomInt(WORD_BANK.length)];
+  room.category = chosen.category;
+  room.word = chosen.word;
+  const imposter = room.players[randomInt(room.players.length)];
+  room.imposterId = imposter.id;
+}
 
-  room.phase = 'drawing';
-  room.turnTimerStarted = false;
+function beginVoting(room) {
+  clearTimers(room);
+  room.phase = 'voting';
+  room.activePlayerId = null;
+  room.turnEndsAt = null;
+  room.turnStartedAt = null;
+  room.votes = {};
+  room.voteCounts = {};
+  room.voteEndsAt = Date.now() + VOTING_MS;
 
-  const active = room.players[room.turnIndex % room.players.length];
-  io.to(room.code).emit('turn_started', {
-    activePlayerId: active.id,
-    ...getTurnContext(room)
-  });
+  room.voteTimer = setTimeout(() => {
+    concludeVoting(room);
+  }, VOTING_MS);
+
+  io.to(room.code).emit('phaseChanged', { phase: 'voting' });
   emitRoomState(room);
 }
 
-function endTurn(room, reason) {
-  if (room.phase !== 'drawing') {
+function advanceToNextTurn(room, reason) {
+  if (room.phase !== 'drawing') return;
+  clearTimeout(room.drawTimer);
+  room.drawTimer = null;
+  room.turnEndsAt = null;
+  room.turnStartedAt = null;
+
+  room.turnNumber += 1;
+  if (room.turnNumber >= room.totalTurns) {
+    beginVoting(room);
     return;
   }
-  if (room.timeouts.turn) {
-    clearTimeout(room.timeouts.turn);
-    room.timeouts.turn = null;
+
+  room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
+  io.to(room.code).emit('turnAdvanced', { reason });
+  activateTurn(room);
+}
+
+function activateTurn(room) {
+  if (room.phase !== 'drawing') return;
+  if (!room.turnOrder.length) {
+    beginVoting(room);
+    return;
   }
-  io.to(room.code).emit('turn_ended', { reason });
-  room.turnIndex += 1;
-  beginTurn(room);
+
+  const activeId = room.turnOrder[room.currentTurnIndex];
+  if (!room.players.some((p) => p.id === activeId)) {
+    room.turnOrder = room.turnOrder.filter((id) => room.players.some((p) => p.id === id));
+    if (!room.turnOrder.length) {
+      beginVoting(room);
+      return;
+    }
+    room.currentTurnIndex = room.currentTurnIndex % room.turnOrder.length;
+    activateTurn(room);
+    return;
+  }
+
+  room.activePlayerId = activeId;
+  room.turnStartedAt = null;
+  room.turnEndsAt = null;
+  emitRoomState(room);
 }
 
-function normalizeText(input) {
-  return String(input || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+function finishGame(room, outcome) {
+  clearTimers(room);
 
-function levenshtein(a, b) {
-  const m = a.length;
-  const n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
-  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
-  for (let i = 1; i <= m; i += 1) {
-    for (let j = 1; j <= n; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+  if (outcome === 'imposter_victory' || outcome === 'heist_win') {
+    const imposter = room.players.find((p) => p.id === room.imposterId);
+    if (imposter) imposter.score += outcome === 'heist_win' ? 3 : 2;
+  } else if (outcome === 'artists_win') {
+    for (const player of room.players) {
+      if (player.id !== room.imposterId) player.score += 1;
     }
   }
-  return dp[m][n];
-}
 
-function isGuessCorrect(guess, secretWord) {
-  const normalizedGuess = normalizeText(guess);
-  const normalizedSecret = normalizeText(secretWord);
-  if (!normalizedGuess || !normalizedSecret) return false;
-  if (normalizedGuess === normalizedSecret) return true;
-  const distance = levenshtein(normalizedGuess, normalizedSecret);
-  return distance <= Math.max(1, Math.floor(normalizedSecret.length * 0.2));
-}
+  room.phase = 'ended';
+  room.activePlayerId = null;
+  room.turnEndsAt = null;
+  room.turnStartedAt = null;
+  room.voteEndsAt = null;
+  room.showdownEndsAt = null;
+  room.result = {
+    outcome,
+    imposterId: room.imposterId,
+    word: room.word,
+    category: room.category,
+    votedOutId: room.votedOutId || null
+  };
 
-function finishWithResult(room, result) {
-  clearTimers(room);
-  room.phase = 'result';
-  room.revealed = true;
-
-  if (result.winner === 'imposter') {
-    const imp = room.players.find((p) => p.id === room.imposterId);
-    if (imp) imp.score += 2;
-  }
-  if (result.winner === 'artists') {
-    room.players.forEach((p) => {
-      if (p.id !== room.imposterId) {
-        p.score += 1;
-      }
-    });
-  }
-
-  io.to(room.code).emit('showdown_result', {
-    ...result,
-    secretWord: room.secret.word,
-    category: room.secret.category,
-    imposterId: room.imposterId
-  });
-
-  room.playAgainVotes.clear();
+  io.to(room.code).emit('phaseChanged', { phase: 'ended', outcome });
   emitRoomState(room);
 }
 
-function startGuessing(room) {
-  room.phase = 'guessing';
-  emitTimer(room, GUESS_MS, 'Imposter Guess', 'guessing');
-  io.to(room.code).emit('phase_change', { phase: room.phase, message: 'Imposter wurde enttarnt! Rate jetzt das Wort.' });
-  room.timeouts.guessing = setTimeout(() => {
-    finishWithResult(room, {
-      winner: 'artists',
-      title: 'Artists Win',
-      subtitle: 'Der Imposter hat das geheime Wort nicht rechtzeitig erraten.'
-    });
-  }, GUESS_MS);
+function beginShowdown(room) {
+  clearTimers(room);
+  room.phase = 'showdown';
+  room.showdownEndsAt = Date.now() + SHOWDOWN_MS;
+
+  room.showdownTimer = setTimeout(() => {
+    finishGame(room, 'artists_win');
+  }, SHOWDOWN_MS);
+
+  io.to(room.code).emit('phaseChanged', { phase: 'showdown' });
   emitRoomState(room);
 }
 
 function concludeVoting(room) {
   if (room.phase !== 'voting') return;
-  if (room.timeouts.voting) {
-    clearTimeout(room.timeouts.voting);
-    room.timeouts.voting = null;
+
+  clearTimeout(room.voteTimer);
+  room.voteTimer = null;
+
+  recalcVoteCounts(room);
+  const entries = Object.entries(room.voteCounts);
+  entries.sort((a, b) => b[1] - a[1]);
+
+  let votedOutId = null;
+  if (entries.length) {
+    const highest = entries[0][1];
+    const tied = entries.filter((entry) => entry[1] === highest).length > 1;
+    if (!tied) votedOutId = entries[0][0];
   }
 
-  const tally = {};
-  Object.values(room.votes).forEach((targetId) => {
-    tally[targetId] = (tally[targetId] || 0) + 1;
-  });
+  room.votedOutId = votedOutId;
 
-  const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
-  const topVotes = entries[0]?.[1] || 0;
-  const topTargets = entries.filter((entry) => entry[1] === topVotes);
-
-  if (topVotes === 0 || topTargets.length !== 1) {
-    finishWithResult(room, {
-      winner: 'imposter',
-      title: 'Imposter Victory Screen',
-      subtitle: 'Keine klare Mehrheit – der Imposter entkommt im Chaos.'
-    });
+  if (!votedOutId || votedOutId !== room.imposterId) {
+    finishGame(room, 'imposter_victory');
     return;
   }
 
-  const votedOutId = topTargets[0][0];
-  if (votedOutId !== room.imposterId) {
-    finishWithResult(room, {
-      winner: 'imposter',
-      title: 'Imposter Victory Screen',
-      subtitle: 'Mehrheit hat einen Unschuldigen gewählt.'
-    });
-    return;
-  }
-
-  io.to(room.code).emit('phase_change', { phase: 'guessing', message: 'Imposter korrekt erkannt! Finaler Showdown...' });
-  startGuessing(room);
+  beginShowdown(room);
 }
 
-function startVoting(room) {
-  room.phase = 'voting';
+function resetForLobby(room, reason) {
+  clearTimers(room);
+  room.phase = 'lobby';
+  room.roundNumber = Math.max(room.roundNumber, 1);
+  room.activePlayerId = null;
+  room.turnOrder = [];
+  room.currentTurnIndex = 0;
+  room.turnNumber = 0;
+  room.totalTurns = 0;
+  room.turnEndsAt = null;
+  room.turnStartedAt = null;
+  room.voteEndsAt = null;
+  room.showdownEndsAt = null;
   room.votes = {};
-  emitTimer(room, VOTING_MS, 'Voting', 'voting');
-  io.to(room.code).emit('phase_change', { phase: room.phase, message: 'Voting gestartet: Wer ist der Imposter?' });
-  room.timeouts.voting = setTimeout(() => {
-    concludeVoting(room);
-  }, VOTING_MS);
+  room.voteCounts = {};
+  room.result = null;
+  room.category = null;
+  room.word = null;
+  room.imposterId = null;
+  room.votedOutId = null;
+  room.strokes = [];
+  if (reason) io.to(room.code).emit('systemMessage', reason);
+  io.to(room.code).emit('canvasReset');
   emitRoomState(room);
 }
 
-function assignRoles(room) {
-  const availableWords = WORD_POOL.filter((entry) => !room.usedWords.has(`${entry.category}:${entry.word}`));
-  const source = availableWords.length ? availableWords : WORD_POOL;
-  const picked = source[Math.floor(Math.random() * source.length)];
+function startMatch(room) {
+  if (room.players.length < MIN_PLAYERS) return false;
 
-  room.secret = picked;
-  room.usedWords.add(`${picked.category}:${picked.word}`);
-  room.imposterId = room.players[Math.floor(Math.random() * room.players.length)].id;
-
-  room.players.forEach((player) => {
-    player.role = player.id === room.imposterId ? 'imposter' : 'artist';
-  });
-}
-
-function startGame(room) {
   clearTimers(room);
-  room.turnIndex = 0;
-  room.turnTimerStarted = false;
+  room.roundNumber += 1;
+  room.phase = 'drawing';
+  room.result = null;
+  room.votedOutId = null;
+  room.strokes = [];
   room.votes = {};
-  room.replayEvents = [];
-  room.revealed = false;
-  room.playAgainVotes.clear();
+  room.voteCounts = {};
+  room.voteEndsAt = null;
+  room.showdownEndsAt = null;
 
-  assignRoles(room);
+  assignRoundSecrets(room);
+  room.turnOrder = room.players.map((p) => p.id);
+  room.currentTurnIndex = 0;
+  room.turnNumber = 0;
+  room.totalTurns = room.turnOrder.length * 2;
 
-  room.players.forEach((player) => {
-    io.to(player.id).emit('role_info', {
-      role: player.role,
-      category: room.secret.category,
-      word: player.role === 'imposter' ? null : room.secret.word,
-      warning: player.role === 'imposter' ? 'DU BIST DER IMPOSTER!' : null
-    });
-  });
-
-  io.to(room.code).emit('reset_canvas');
-  io.to(room.code).emit('phase_change', { phase: 'drawing', message: 'Zeichnen startet! Der Timer beginnt beim ersten Strich.' });
-  beginTurn(room);
+  io.to(room.code).emit('canvasReset');
+  io.to(room.code).emit('phaseChanged', { phase: 'drawing' });
+  activateTurn(room);
+  return true;
 }
 
-function findRoomBySocket(socketId) {
-  for (const room of rooms.values()) {
-    if (room.players.some((p) => p.id === socketId)) return room;
+function removePlayer(room, socketId) {
+  const idx = room.players.findIndex((p) => p.id === socketId);
+  if (idx === -1) return;
+
+  const [removed] = room.players.splice(idx, 1);
+  const wasHost = room.hostId === socketId;
+  const wasActive = room.activePlayerId === socketId;
+  const removedTurnOrderIndex = (room.turnOrder || []).indexOf(socketId);
+
+  delete room.votes[socketId];
+  recalcVoteCounts(room);
+
+  if (wasHost && room.players.length) {
+    room.hostId = room.players[0].id;
   }
-  return null;
+
+  if (removedTurnOrderIndex !== -1 && removedTurnOrderIndex < room.currentTurnIndex) {
+    room.currentTurnIndex = Math.max(0, room.currentTurnIndex - 1);
+  }
+  room.turnOrder = (room.turnOrder || []).filter((id) => id !== socketId);
+  if (room.currentTurnIndex >= room.turnOrder.length) {
+    room.currentTurnIndex = 0;
+  }
+
+  if (!room.players.length) {
+    clearTimers(room);
+    rooms.delete(room.code);
+    return;
+  }
+
+  if (room.players.length < MIN_PLAYERS && room.phase !== 'lobby') {
+    resetForLobby(room, 'Zu wenige Spieler. Das Spiel wurde in die Lobby zurückgesetzt.');
+    return;
+  }
+
+  if (room.phase === 'drawing' && wasActive) {
+    clearTimeout(room.drawTimer);
+    room.drawTimer = null;
+    room.turnStartedAt = null;
+    room.turnEndsAt = null;
+    room.turnNumber += 1;
+    room.totalTurns = room.turnOrder.length * 2;
+    if (room.turnNumber >= room.totalTurns) {
+      beginVoting(room);
+      return;
+    }
+    activateTurn(room);
+    return;
+  }
+
+  if (room.phase === 'voting' && Object.keys(room.votes).length >= room.players.length) {
+    concludeVoting(room);
+    return;
+  }
+
+  if (room.phase === 'showdown' && removed.id === room.imposterId) {
+    finishGame(room, 'artists_win');
+    return;
+  }
+
+  emitRoomState(room);
 }
 
 io.on('connection', (socket) => {
-  socket.on('join_room', ({ nickname, roomCode }) => {
-    const safeName = sanitizeNickname(nickname);
-    if (!safeName) {
-      socket.emit('join_error', { message: 'Bitte gib einen gültigen Nickname ein.' });
+  socket.on('createRoom', ({ nickname }) => {
+    const cleanName = sanitizeNickname(nickname);
+    if (!cleanName) {
+      socket.emit('errorMessage', 'Bitte gib einen gültigen Nickname ein.');
       return;
     }
 
-    const normalizedCode = String(roomCode || '').trim();
-    if (normalizedCode && !/^\d{4}$/.test(normalizedCode)) {
-      socket.emit('join_error', { message: 'Raumcode muss genau 4 Ziffern haben.' });
-      return;
-    }
-    const code = normalizedCode || makeCode();
-
-    let room = rooms.get(code);
-    if (!room) {
-      room = createRoom(code, socket.id);
-      rooms.set(code, room);
-    }
-
-    if (room.phase !== 'lobby' && room.phase !== 'result') {
-      socket.emit('join_error', { message: 'Das Spiel läuft bereits. Bitte warte auf eine neue Runde.' });
-      return;
-    }
-
-    if (room.players.some((p) => p.nickname.toLowerCase() === safeName.toLowerCase())) {
-      socket.emit('join_error', { message: 'Nickname ist bereits vergeben.' });
-      return;
-    }
-
-    const player = {
-      id: socket.id,
-      nickname: safeName,
-      color: COLOR_PALETTE[room.players.length % COLOR_PALETTE.length],
-      role: null,
-      score: 0
+    const code = createRoomCode();
+    const room = {
+      code,
+      hostId: socket.id,
+      players: [{ id: socket.id, nickname: cleanName, color: COLORS[0], score: 0 }],
+      phase: 'lobby',
+      roundNumber: 0,
+      activePlayerId: null,
+      turnOrder: [],
+      currentTurnIndex: 0,
+      turnNumber: 0,
+      totalTurns: 0,
+      turnEndsAt: null,
+      turnStartedAt: null,
+      voteEndsAt: null,
+      showdownEndsAt: null,
+      drawTimer: null,
+      voteTimer: null,
+      showdownTimer: null,
+      votes: {},
+      voteCounts: {},
+      result: null,
+      strokes: [],
+      category: null,
+      word: null,
+      imposterId: null,
+      votedOutId: null
     };
 
-    room.players.push(player);
+    rooms.set(code, room);
+    playerRoom.set(socket.id, code);
     socket.join(code);
-    socket.emit('room_joined', { code, hostId: room.hostId });
 
+    socket.emit('joinedRoom', { roomCode: code, playerId: socket.id });
     emitRoomState(room);
-    if (room.phase === 'result') {
-      io.to(room.code).emit('phase_change', { phase: 'result', message: 'Runde beendet. Warte auf Play Again.' });
-    }
   });
 
-  socket.on('start_game', () => {
-    const room = findRoomBySocket(socket.id);
+  socket.on('joinRoom', ({ nickname, roomCode }) => {
+    const cleanName = sanitizeNickname(nickname);
+    const code = String(roomCode || '').trim();
+    if (!cleanName || !/^\d{4}$/.test(code)) {
+      socket.emit('errorMessage', 'Ungültiger Name oder Raumcode.');
+      return;
+    }
+
+    const room = rooms.get(code);
+    if (!room) {
+      socket.emit('errorMessage', 'Raum nicht gefunden.');
+      return;
+    }
+
+    if (room.phase !== 'lobby') {
+      socket.emit('errorMessage', 'Das Spiel läuft bereits. Bitte warte auf die nächste Runde.');
+      return;
+    }
+
+    if (room.players.some((p) => p.nickname.toLowerCase() === cleanName.toLowerCase())) {
+      socket.emit('errorMessage', 'Dieser Nickname ist in diesem Raum bereits vergeben.');
+      return;
+    }
+
+    const color = COLORS[room.players.length % COLORS.length];
+    room.players.push({ id: socket.id, nickname: cleanName, color, score: 0 });
+    playerRoom.set(socket.id, code);
+    socket.join(code);
+
+    socket.emit('joinedRoom', { roomCode: code, playerId: socket.id });
+    emitRoomState(room);
+  });
+
+  socket.on('startGame', () => {
+    const room = findRoomBySocketId(socket.id);
     if (!room) return;
-
     if (room.hostId !== socket.id) {
-      socket.emit('join_error', { message: 'Nur der Host kann das Spiel starten.' });
+      socket.emit('errorMessage', 'Nur der Host kann das Spiel starten.');
       return;
     }
-
     if (room.players.length < MIN_PLAYERS) {
-      socket.emit('join_error', { message: `Mindestens ${MIN_PLAYERS} Spieler benötigt.` });
+      socket.emit('errorMessage', `Mindestens ${MIN_PLAYERS} Spieler benötigt.`);
       return;
     }
 
-    startGame(room);
+    startMatch(room);
   });
 
-  socket.on('drawing_point', ({ x, y, isNewStroke }) => {
-    const room = findRoomBySocket(socket.id);
-    if (!room || room.phase !== 'drawing') return;
+  socket.on('drawPoint', ({ x, y, isNewStroke }) => {
+    const room = findRoomBySocketId(socket.id);
+    if (!room || room.phase !== 'drawing' || room.activePlayerId !== socket.id) return;
 
-    const active = room.players[room.turnIndex % room.players.length];
-    if (!active || active.id !== socket.id) return;
+    const nx = Number(x);
+    const ny = Number(y);
+    if (!Number.isFinite(nx) || !Number.isFinite(ny) || nx < 0 || ny < 0 || nx > 1 || ny > 1) return;
 
-    const safeX = Number(x);
-    const safeY = Number(y);
-    if (!Number.isFinite(safeX) || !Number.isFinite(safeY)) return;
+    if (!room.turnStartedAt) {
+      room.turnStartedAt = Date.now();
+      room.turnEndsAt = room.turnStartedAt + DRAW_TURN_MS;
+      room.drawTimer = setTimeout(() => {
+        advanceToNextTurn(room, 'timer_expired');
+      }, DRAW_TURN_MS);
+      emitRoomState(room);
+    }
 
-    const normalized = {
-      x: Math.min(1, Math.max(0, safeX)),
-      y: Math.min(1, Math.max(0, safeY)),
-      isNewStroke: Boolean(isNewStroke),
+    const payload = {
       playerId: socket.id,
-      color: active.color
+      color: room.players.find((p) => p.id === socket.id)?.color || '#ffffff',
+      x: nx,
+      y: ny,
+      isNewStroke: Boolean(isNewStroke)
     };
 
-    room.replayEvents.push(normalized);
-
-    if (!room.turnTimerStarted) {
-      room.turnTimerStarted = true;
-      emitTimer(room, TURN_MS, 'Turn', 'turn');
-      room.timeouts.turn = setTimeout(() => {
-        endTurn(room, 'timeout');
-      }, TURN_MS);
-    }
-
-    io.to(room.code).emit('drawing_point', normalized);
+    room.strokes.push(payload);
+    io.to(room.code).emit('drawPoint', payload);
   });
 
-  socket.on('stroke_end', () => {
-    const room = findRoomBySocket(socket.id);
-    if (!room || room.phase !== 'drawing') return;
-    const active = room.players[room.turnIndex % room.players.length];
-    if (!active || active.id !== socket.id || !room.turnTimerStarted) return;
-    endTurn(room, 'released');
+  socket.on('strokeEnd', () => {
+    const room = findRoomBySocketId(socket.id);
+    if (!room || room.phase !== 'drawing' || room.activePlayerId !== socket.id) return;
+    if (!room.turnStartedAt) return;
+    advanceToNextTurn(room, 'stroke_end');
   });
 
-  socket.on('cast_vote', ({ targetId }) => {
-    const room = findRoomBySocket(socket.id);
+  socket.on('castVote', ({ targetId }) => {
+    const room = findRoomBySocketId(socket.id);
     if (!room || room.phase !== 'voting') return;
     if (!room.players.some((p) => p.id === targetId)) return;
 
     room.votes[socket.id] = targetId;
-    io.to(room.code).emit('vote_update', {
-      votedPlayers: Object.keys(room.votes)
-    });
+    recalcVoteCounts(room);
+    emitRoomState(room);
 
     if (Object.keys(room.votes).length >= room.players.length) {
       concludeVoting(room);
     }
   });
 
-  socket.on('submit_guess', ({ guess }) => {
-    const room = findRoomBySocket(socket.id);
-    if (!room || room.phase !== 'guessing') return;
-    if (socket.id !== room.imposterId) return;
+  socket.on('submitImposterGuess', ({ guess }) => {
+    const room = findRoomBySocketId(socket.id);
+    if (!room || room.phase !== 'showdown' || socket.id !== room.imposterId) return;
 
-    if (room.timeouts.guessing) {
-      clearTimeout(room.timeouts.guessing);
-      room.timeouts.guessing = null;
+    const submitted = normalizeGuess(guess);
+    const solution = normalizeGuess(room.word);
+    if (submitted && submitted === solution) {
+      finishGame(room, 'heist_win');
+      return;
     }
 
-    if (isGuessCorrect(guess, room.secret.word)) {
-      finishWithResult(room, {
-        winner: 'imposter',
-        title: 'Heist Win',
-        subtitle: 'Der Imposter hat das geheime Wort erraten.'
-      });
-    } else {
-      finishWithResult(room, {
-        winner: 'artists',
-        title: 'Artists Win',
-        subtitle: 'Der Imposter lag mit dem Wort daneben.'
-      });
-    }
+    finishGame(room, 'artists_win');
   });
 
-  socket.on('play_again', () => {
-    const room = findRoomBySocket(socket.id);
-    if (!room || room.phase !== 'result') return;
-
-    room.playAgainVotes.add(socket.id);
-    emitRoomState(room);
-
-    if (room.playAgainVotes.size === room.players.length && room.players.length >= MIN_PLAYERS) {
-      startGame(room);
+  socket.on('playAgain', () => {
+    const room = findRoomBySocketId(socket.id);
+    if (!room) return;
+    if (room.hostId !== socket.id) {
+      socket.emit('errorMessage', 'Nur der Host kann eine neue Runde starten.');
+      return;
     }
+    if (room.phase !== 'ended' && room.phase !== 'lobby') return;
+    if (room.players.length < MIN_PLAYERS) {
+      socket.emit('errorMessage', `Mindestens ${MIN_PLAYERS} Spieler benötigt.`);
+      return;
+    }
+
+    startMatch(room);
+  });
+
+  socket.on('requestCanvasSync', () => {
+    const room = findRoomBySocketId(socket.id);
+    if (!room) return;
+    socket.emit('canvasSnapshot', room.strokes);
   });
 
   socket.on('disconnect', () => {
-    const room = findRoomBySocket(socket.id);
+    const room = findRoomBySocketId(socket.id);
     if (!room) return;
-
-    const leavingIndex = room.players.findIndex((p) => p.id === socket.id);
-    if (leavingIndex === -1) return;
-
-    const wasActive = room.phase === 'drawing' && room.players[room.turnIndex % room.players.length]?.id === socket.id;
-    const wasHost = room.hostId === socket.id;
-    const wasImposter = room.imposterId === socket.id;
-
-    room.players.splice(leavingIndex, 1);
-    room.playAgainVotes.delete(socket.id);
-    delete room.votes[socket.id];
-    Object.keys(room.votes).forEach((voterId) => {
-      if (room.votes[voterId] === socket.id) {
-        delete room.votes[voterId];
-      }
-    });
-
-    if (!room.players.length) {
-      clearTimers(room);
-      rooms.delete(room.code);
-      return;
-    }
-
-    if (wasHost) {
-      room.hostId = room.players[0].id;
-      io.to(room.code).emit('host_changed', { hostId: room.hostId });
-    }
-
-    if (room.players.length < MIN_PLAYERS && room.phase !== 'lobby') {
-      finishWithResult(room, {
-        winner: 'artists',
-        title: 'Runde beendet',
-        subtitle: 'Zu wenige Spieler. Neue Runde im Lobby-Modus.'
-      });
-      room.phase = 'lobby';
-      room.revealed = false;
-      emitRoomState(room);
-      return;
-    }
-
-    if (room.phase === 'guessing' && wasImposter) {
-      finishWithResult(room, {
-        winner: 'artists',
-        title: 'Artists Win',
-        subtitle: 'Der Imposter hat das Spiel verlassen.'
-      });
-      return;
-    }
-
-    if (room.phase === 'drawing') {
-      if (leavingIndex <= room.turnIndex % (room.players.length + 1)) {
-        room.turnIndex = Math.max(0, room.turnIndex - 1);
-      }
-      if (wasActive) {
-        endTurn(room, 'player_left');
-      } else {
-        emitRoomState(room);
-      }
-      return;
-    }
-
-    if (room.phase === 'voting' && Object.keys(room.votes).length >= room.players.length) {
-      concludeVoting(room);
-      return;
-    }
-
-    emitRoomState(room);
+    playerRoom.delete(socket.id);
+    removePlayer(room, socket.id);
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`SABOTAGE CANVAS server listening on port ${PORT}`);
+  console.log(`SABOTAGE CANVAS server running on port ${PORT}`);
 });

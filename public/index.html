@@ -5,102 +5,161 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SABOTAGE CANVAS</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              inter: ['Inter', 'sans-serif']
+            },
+            boxShadow: {
+              neonCyan: '0 0 0 1px rgba(34,211,238,.35), 0 0 18px rgba(34,211,238,.25)',
+              neonRose: '0 0 0 1px rgba(244,63,94,.35), 0 0 18px rgba(244,63,94,.25)',
+              neonEmerald: '0 0 0 1px rgba(16,185,129,.35), 0 0 18px rgba(16,185,129,.25)'
+            }
+          }
+        }
+      };
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        font-family: 'Inter', system-ui, sans-serif;
+        color-scheme: dark;
       }
+
       body {
-        background: #0b0f19;
+        background: radial-gradient(circle at 20% 20%, #11182a 0%, #0b0f19 38%, #090c14 100%);
       }
+
       .glass {
         background: rgba(15, 23, 42, 0.8);
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(12px);
         border: 1px solid rgba(30, 41, 59, 0.8);
         border-radius: 1rem;
       }
-      .neon-cyan {
-        box-shadow: 0 0 0.5rem rgba(34, 211, 238, 0.6), 0 0 1.2rem rgba(34, 211, 238, 0.4);
-      }
-      .neon-rose {
-        box-shadow: 0 0 0.5rem rgba(244, 63, 94, 0.6), 0 0 1.2rem rgba(244, 63, 94, 0.4);
-      }
-      .neon-emerald {
-        box-shadow: 0 0 0.5rem rgba(16, 185, 129, 0.6), 0 0 1.2rem rgba(16, 185, 129, 0.4);
-      }
-      #drawCanvas {
+
+      #gameCanvas {
         touch-action: none;
+        background: linear-gradient(160deg, #0f172a 0%, #111827 100%);
       }
+
+      .timer-fill {
+        background: linear-gradient(90deg, #10b981 0%, #facc15 50%, #ef4444 100%);
+      }
+
       .pulse {
-        animation: pulseGlow 1s infinite;
+        animation: pulseScale 900ms ease-in-out infinite;
       }
-      @keyframes pulseGlow {
+
+      @keyframes pulseScale {
         0%,
         100% {
-          box-shadow: 0 0 0.4rem rgba(248, 113, 113, 0.5);
+          transform: scale(1);
         }
         50% {
-          box-shadow: 0 0 1rem rgba(248, 113, 113, 1);
+          transform: scale(1.04);
         }
       }
     </style>
   </head>
-  <body class="text-slate-100 min-h-screen">
-    <main class="max-w-7xl mx-auto p-4 md:p-6">
-      <section id="lobbyPanel" class="glass p-6 max-w-2xl mx-auto mt-10 space-y-5">
-        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-center">SABOTAGE CANVAS</h1>
-        <p class="text-slate-300 text-center">Finde den Imposter, bevor er den Heist vollendet.</p>
+  <body class="font-inter text-slate-100 min-h-screen">
+    <main class="max-w-7xl mx-auto px-4 py-6 md:py-8">
+      <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-extrabold tracking-wide">SABOTAGE CANVAS</h1>
+          <p class="text-slate-400 text-sm md:text-base">Zeichne schnell. Täusche besser. Entlarve den Imposter.</p>
+        </div>
+        <div id="connectionDot" class="px-3 py-1 rounded-full bg-slate-900/90 border border-slate-700 text-xs uppercase tracking-wider">
+          Verbinde...
+        </div>
+      </header>
+
+      <section id="lobbyPanel" class="glass p-5 md:p-6 mb-5">
         <div class="grid md:grid-cols-2 gap-4">
-          <input id="nicknameInput" type="text" maxlength="18" placeholder="Nickname" class="bg-slate-950/70 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400" />
-          <input id="roomInput" type="text" maxlength="4" placeholder="Raumcode (optional)" class="bg-slate-950/70 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-cyan-400" />
+          <div>
+            <label for="nicknameInput" class="text-sm text-slate-300">Nickname</label>
+            <input id="nicknameInput" maxlength="20" class="mt-1 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-4 py-2.5 outline-none focus:border-cyan-400" placeholder="z. B. NeonNinja" />
+          </div>
+          <div>
+            <label for="roomInput" class="text-sm text-slate-300">4-stelliger Raumcode</label>
+            <input id="roomInput" inputmode="numeric" maxlength="4" class="mt-1 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-4 py-2.5 outline-none focus:border-cyan-400" placeholder="1234" />
+          </div>
         </div>
-        <div class="grid md:grid-cols-2 gap-3">
-          <button id="createBtn" class="rounded-xl py-3 font-semibold bg-cyan-500/20 border border-cyan-400/40 hover:bg-cyan-500/30 neon-cyan">Neuen Raum erstellen</button>
-          <button id="joinBtn" class="rounded-xl py-3 font-semibold bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 neon-emerald">Raum beitreten</button>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <button id="createRoomBtn" class="rounded-xl px-4 py-2.5 bg-cyan-500/20 border border-cyan-400/60 text-cyan-200 font-semibold hover:bg-cyan-500/30">Raum erstellen</button>
+          <button id="joinRoomBtn" class="rounded-xl px-4 py-2.5 bg-emerald-500/20 border border-emerald-400/60 text-emerald-200 font-semibold hover:bg-emerald-500/30">Raum beitreten</button>
         </div>
-        <p id="lobbyError" class="text-rose-400 min-h-6 text-sm text-center"></p>
+        <p id="lobbyError" class="mt-3 min-h-5 text-rose-300 text-sm"></p>
       </section>
 
-      <section id="gamePanel" class="hidden space-y-4">
-        <div class="glass p-4 flex flex-wrap gap-3 items-center justify-between">
-          <div>
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Raum</p>
-            <p class="text-xl font-bold"><span id="roomCodeLabel">----</span></p>
-          </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <button id="inviteBtn" class="px-4 py-2 rounded-lg border border-cyan-400/40 bg-cyan-500/20 hover:bg-cyan-500/30">Invite Link</button>
-            <button id="startBtn" class="px-4 py-2 rounded-lg border border-emerald-400/40 bg-emerald-500/20 hover:bg-emerald-500/30">Start Game</button>
-            <button id="playAgainBtn" class="hidden px-4 py-2 rounded-lg border border-violet-400/40 bg-violet-500/20 hover:bg-violet-500/30">Play Again</button>
-          </div>
-        </div>
-
-        <div class="grid lg:grid-cols-[1fr_320px] gap-4">
-          <div class="space-y-3">
-            <div id="rolePanel" class="glass p-4 flex flex-wrap items-center gap-2"></div>
-            <div class="glass p-3">
-              <div class="flex justify-between text-xs text-slate-300 mb-2"><span id="timerLabel">Bereit</span><span id="timerText">0.0s</span></div>
-              <div id="timerWrap" class="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                <div id="timerBar" class="h-full w-0 bg-emerald-400 transition-[width] duration-75"></div>
+      <section id="gamePanel" class="hidden">
+        <div class="grid lg:grid-cols-[1fr_320px] gap-5">
+          <div class="space-y-4">
+            <div class="glass p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="text-xs uppercase tracking-[0.18em] text-slate-400">Raum</div>
+                  <div class="text-lg font-bold" id="roomCodeDisplay">----</div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button id="inviteBtn" class="rounded-xl px-3 py-2 bg-slate-800 border border-slate-700 hover:border-cyan-400">Invite Link kopieren</button>
+                  <button id="startBtn" class="rounded-xl px-3 py-2 bg-cyan-500/20 border border-cyan-400/60 text-cyan-200 font-semibold">Spiel starten</button>
+                  <button id="playAgainBtn" class="hidden rounded-xl px-3 py-2 bg-emerald-500/20 border border-emerald-400/60 text-emerald-200 font-semibold">Play Again</button>
+                </div>
               </div>
             </div>
-            <div class="glass p-3">
-              <canvas id="drawCanvas" class="w-full h-[58vh] min-h-[340px] rounded-xl border border-slate-700 bg-slate-950/80"></canvas>
-            </div>
-            <div id="guessPanel" class="glass p-4 hidden">
-              <p class="font-semibold mb-2">Finaler Guess: Gib das geheime Wort ein</p>
-              <div class="flex gap-2">
-                <input id="guessInput" type="text" class="flex-1 bg-slate-950/70 border border-slate-700 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-rose-400" />
-                <button id="guessBtn" class="px-4 py-2 rounded-xl bg-rose-500/20 border border-rose-400/40 hover:bg-rose-500/30">Senden</button>
+
+            <div class="glass p-4 md:p-5">
+              <div class="mb-3">
+                <div class="flex items-center justify-between text-sm mb-2">
+                  <span id="timerLabel" class="text-slate-300">Turn-Timer</span>
+                  <span id="timerValue" class="font-semibold text-slate-200">--.-s</span>
+                </div>
+                <div class="h-3 w-full rounded-full bg-slate-800 overflow-hidden border border-slate-700">
+                  <div id="timerBar" class="timer-fill h-full w-0 transition-[width] duration-75"></div>
+                </div>
               </div>
+              <div class="rounded-2xl border border-slate-700/70 overflow-hidden shadow-[inset_0_0_0_1px_rgba(15,23,42,0.7)]">
+                <canvas id="gameCanvas" class="w-full h-[420px] md:h-[540px] block"></canvas>
+              </div>
+              <p id="statusLine" class="mt-3 text-sm md:text-base text-slate-200">Warte auf Spieler...</p>
+              <div id="legend" class="mt-3 flex flex-wrap gap-2"></div>
             </div>
-            <div id="statusPanel" class="glass p-4 text-sm text-slate-200"></div>
           </div>
 
-          <aside class="glass p-4 space-y-3">
-            <h2 class="text-lg font-bold">Spieler & Punkte</h2>
-            <div id="playersList" class="space-y-2"></div>
+          <aside class="space-y-4">
+            <div class="glass p-4">
+              <h2 class="font-semibold mb-3">Deine Rolle</h2>
+              <div class="space-y-2 text-sm">
+                <p class="text-slate-300">Kategorie: <span id="categoryText" class="text-cyan-300 font-semibold">-</span></p>
+                <p class="text-slate-300">Wort: <span id="wordText" class="text-emerald-300 font-semibold">-</span></p>
+                <p id="imposterBadge" class="hidden text-xs font-bold px-3 py-2 rounded-xl bg-rose-500/20 border border-rose-500/60 text-rose-200 shadow-neonRose">DU BIST DER IMPOSTER!</p>
+              </div>
+            </div>
+
+            <div class="glass p-4">
+              <h2 class="font-semibold mb-3">Spieler</h2>
+              <div id="playersList" class="space-y-2"></div>
+            </div>
+
+            <div id="votePanel" class="glass p-4 hidden">
+              <h2 class="font-semibold mb-3">Voting (30s)</h2>
+              <div id="voteCards" class="grid gap-2"></div>
+            </div>
+
+            <div id="showdownPanel" class="glass p-4 hidden">
+              <h2 class="font-semibold mb-2">Showdown</h2>
+              <p id="showdownText" class="text-sm text-slate-300 mb-3"></p>
+              <div id="guessWrap" class="hidden space-y-2">
+                <input id="guessInput" class="w-full rounded-xl bg-slate-950/70 border border-slate-700 px-3 py-2.5 outline-none focus:border-rose-400" placeholder="Geheimes Wort eingeben" />
+                <button id="submitGuessBtn" class="w-full rounded-xl px-3 py-2 bg-rose-500/20 border border-rose-400/60 text-rose-200 font-semibold">Wort bestätigen</button>
+              </div>
+            </div>
           </aside>
         </div>
       </section>

@@ -1,467 +1,566 @@
 const socket = io();
 
 const els = {
+  connectionDot: document.getElementById('connectionDot'),
   lobbyPanel: document.getElementById('lobbyPanel'),
   gamePanel: document.getElementById('gamePanel'),
   nicknameInput: document.getElementById('nicknameInput'),
   roomInput: document.getElementById('roomInput'),
-  createBtn: document.getElementById('createBtn'),
-  joinBtn: document.getElementById('joinBtn'),
+  createRoomBtn: document.getElementById('createRoomBtn'),
+  joinRoomBtn: document.getElementById('joinRoomBtn'),
   lobbyError: document.getElementById('lobbyError'),
-  roomCodeLabel: document.getElementById('roomCodeLabel'),
+  roomCodeDisplay: document.getElementById('roomCodeDisplay'),
   inviteBtn: document.getElementById('inviteBtn'),
   startBtn: document.getElementById('startBtn'),
   playAgainBtn: document.getElementById('playAgainBtn'),
-  rolePanel: document.getElementById('rolePanel'),
-  playersList: document.getElementById('playersList'),
-  statusPanel: document.getElementById('statusPanel'),
   timerLabel: document.getElementById('timerLabel'),
-  timerText: document.getElementById('timerText'),
-  timerWrap: document.getElementById('timerWrap'),
+  timerValue: document.getElementById('timerValue'),
   timerBar: document.getElementById('timerBar'),
-  drawCanvas: document.getElementById('drawCanvas'),
-  guessPanel: document.getElementById('guessPanel'),
+  statusLine: document.getElementById('statusLine'),
+  legend: document.getElementById('legend'),
+  categoryText: document.getElementById('categoryText'),
+  wordText: document.getElementById('wordText'),
+  imposterBadge: document.getElementById('imposterBadge'),
+  playersList: document.getElementById('playersList'),
+  votePanel: document.getElementById('votePanel'),
+  voteCards: document.getElementById('voteCards'),
+  showdownPanel: document.getElementById('showdownPanel'),
+  showdownText: document.getElementById('showdownText'),
+  guessWrap: document.getElementById('guessWrap'),
   guessInput: document.getElementById('guessInput'),
-  guessBtn: document.getElementById('guessBtn')
+  submitGuessBtn: document.getElementById('submitGuessBtn'),
+  canvas: document.getElementById('gameCanvas')
 };
 
-const ctx = els.drawCanvas.getContext('2d');
-let dpr = window.devicePixelRatio || 1;
-let roomCode = '';
-let me = {
-  id: null,
-  role: null,
-  category: null,
-  word: null
+const ctx = els.canvas.getContext('2d');
+const appState = {
+  myId: null,
+  roomCode: null,
+  roomState: null,
+  roleInfo: { category: null, word: null, isImposter: false },
+  strokes: [],
+  pointerDown: false,
+  myVoteTarget: null,
+  timerMode: null,
+  timerEndsAt: null,
+  timerTotalMs: null,
+  timerInterval: null,
+  timerLastTickSecond: null,
+  cssWidth: 0,
+  cssHeight: 0
 };
-let state = {
-  phase: 'lobby',
-  players: [],
-  hostId: null,
-  activePlayerId: null,
-  canDraw: false,
-  votedFor: null,
-  replayEvents: []
-};
-let isPointerDown = false;
-let timerAnim = null;
-let tickSoundMarks = new Set();
+
 let audioCtx = null;
-let currentTimerKind = null;
-const lastPoints = new Map();
+let popAt = 0;
 
-function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
-function playTone({ freq, duration, type = 'sine', gain = 0.06 }) {
+function playTone({ freq, duration, type = 'sine', gain = 0.05, rampTo = null }) {
   if (!audioCtx) return;
-  const osc = audioCtx.createOscillator();
-  const amp = audioCtx.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
-  amp.gain.value = gain;
-  osc.connect(amp);
-  amp.connect(audioCtx.destination);
   const now = audioCtx.currentTime;
-  amp.gain.setValueAtTime(gain, now);
-  amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  const osc = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  if (rampTo) osc.frequency.exponentialRampToValueAtTime(rampTo, now + duration);
+
+  gainNode.gain.setValueAtTime(0.0001, now);
+  gainNode.gain.exponentialRampToValueAtTime(gain, now + 0.01);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
   osc.start(now);
-  osc.stop(now + duration);
+  osc.stop(now + duration + 0.02);
 }
 
 function playPop() {
-  playTone({ freq: 520 + Math.random() * 70, duration: 0.06, type: 'triangle', gain: 0.03 });
+  if (!audioCtx) return;
+  const now = performance.now();
+  if (now - popAt < 80) return;
+  popAt = now;
+  playTone({ freq: 530, rampTo: 280, duration: 0.07, type: 'triangle', gain: 0.035 });
 }
 
-function playUrgentTick() {
-  playTone({ freq: 950, duration: 0.08, type: 'square', gain: 0.05 });
+function playTick() {
+  if (!audioCtx) return;
+  playTone({ freq: 880, duration: 0.08, type: 'square', gain: 0.03 });
 }
 
 function playGong() {
-  playTone({ freq: 250, duration: 0.3, type: 'triangle', gain: 0.08 });
-  setTimeout(() => playTone({ freq: 390, duration: 0.35, type: 'sine', gain: 0.06 }), 80);
+  if (!audioCtx) return;
+  playTone({ freq: 220, rampTo: 130, duration: 0.52, type: 'sine', gain: 0.09 });
+  playTone({ freq: 330, rampTo: 180, duration: 0.45, type: 'triangle', gain: 0.05 });
 }
 
-function setStatus(text) {
-  els.statusPanel.textContent = text;
+function sanitizeCode(value) {
+  return String(value || '')
+    .replace(/\D/g, '')
+    .slice(0, 4);
 }
 
-function updateRolePanel() {
-  const badge = me.role === 'imposter'
-    ? '<span class="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 border border-rose-400/40 neon-rose">DU BIST DER IMPOSTER!</span>'
-    : '<span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 border border-emerald-400/40 neon-emerald">Rolle: Artist</span>';
+function sanitizeNickname(value) {
+  return String(value || '').trim().slice(0, 20);
+}
 
-  const secret = me.role === 'imposter'
-    ? '<span class="text-slate-300">Geheimes Wort: <strong class="text-rose-300">VERBORGEN</strong></span>'
-    : `<span class="text-slate-300">Geheimes Wort: <strong class="text-cyan-300">${me.word || '-'}</strong></span>`;
+function setLobbyError(message) {
+  els.lobbyError.textContent = message || '';
+}
 
-  els.rolePanel.innerHTML = `
-    <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 border border-slate-700">Kategorie: ${me.category || '-'}</span>
-    ${badge}
-    ${secret}
-  `;
+function setStatus(message) {
+  els.statusLine.textContent = message;
+}
+
+function hexToRgba(hex, alpha) {
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  const int = parseInt(full, 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function resizeCanvas() {
-  dpr = window.devicePixelRatio || 1;
-  const rect = els.drawCanvas.getBoundingClientRect();
-  els.drawCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
-  els.drawCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  const dpr = Math.max(window.devicePixelRatio || 1, 1);
+  const rect = els.canvas.getBoundingClientRect();
+  appState.cssWidth = rect.width;
+  appState.cssHeight = rect.height;
+  els.canvas.width = Math.floor(rect.width * dpr);
+  els.canvas.height = Math.floor(rect.height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = 4;
-  redrawReplay();
+  ctx.lineWidth = 3.2;
+  redrawAllStrokes();
 }
 
 function clearCanvas() {
-  const rect = els.drawCanvas.getBoundingClientRect();
-  ctx.clearRect(0, 0, rect.width, rect.height);
-  lastPoints.clear();
+  ctx.clearRect(0, 0, appState.cssWidth, appState.cssHeight);
 }
 
-function drawNormalizedPoint(point) {
-  const rect = els.drawCanvas.getBoundingClientRect();
-  const x = point.x * rect.width;
-  const y = point.y * rect.height;
-
-  ctx.strokeStyle = point.color;
-  ctx.fillStyle = point.color;
-
-  if (point.isNewStroke || !lastPoints.has(point.playerId)) {
-    ctx.beginPath();
-    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    const prev = lastPoints.get(point.playerId);
-    ctx.beginPath();
-    ctx.moveTo(prev.x, prev.y);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  }
-
-  lastPoints.set(point.playerId, { x, y });
-}
-
-function redrawReplay() {
+function redrawAllStrokes() {
   clearCanvas();
-  state.replayEvents.forEach((event) => drawNormalizedPoint(event));
+  for (const stroke of appState.strokes) drawStroke(stroke);
 }
 
-function normalizePointFromEvent(evt) {
-  const rect = els.drawCanvas.getBoundingClientRect();
-  const x = (evt.clientX - rect.left) / rect.width;
-  const y = (evt.clientY - rect.top) / rect.height;
+function drawStroke(stroke) {
+  const x = stroke.x * appState.cssWidth;
+  const y = stroke.y * appState.cssHeight;
+  ctx.strokeStyle = stroke.color;
+  if (stroke.isNewStroke) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 0.01, y + 0.01);
+    ctx.stroke();
+    return;
+  }
+  ctx.lineTo(x, y);
+  ctx.stroke();
+}
+
+function getMyPlayer() {
+  return appState.roomState?.players?.find((p) => p.id === appState.myId) || null;
+}
+
+function canDraw() {
+  return (
+    appState.roomState?.phase === 'drawing' &&
+    appState.roomState?.activePlayerId === appState.myId
+  );
+}
+
+function getPointerNorm(event) {
+  const rect = els.canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
   return {
-    x: Math.max(0, Math.min(1, x)),
-    y: Math.max(0, Math.min(1, y))
+    x: Math.min(1, Math.max(0, x)),
+    y: Math.min(1, Math.max(0, y))
   };
 }
 
-function updatePlayersList() {
-  els.playersList.innerHTML = '';
-  state.players.forEach((player) => {
-    const isMe = player.id === me.id;
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'w-full text-left p-3 rounded-xl border border-slate-700 bg-slate-900/70 transition hover:border-cyan-400/40';
+function sendPoint(event, isNewStroke) {
+  const { x, y } = getPointerNorm(event);
+  socket.emit('drawPoint', { x, y, isNewStroke });
+  playPop();
+}
 
-    if (state.phase === 'voting') {
-      card.classList.add('cursor-pointer');
-      if (state.votedFor === player.id) {
-        card.classList.add('neon-cyan');
-      }
-      card.onclick = () => {
-        state.votedFor = player.id;
-        socket.emit('cast_vote', { targetId: player.id });
-        updatePlayersList();
-      };
-    } else {
-      card.classList.add('cursor-default');
-      card.onclick = null;
+function startTimer(mode, endsAt, totalMs, label) {
+  appState.timerMode = mode;
+  appState.timerEndsAt = endsAt;
+  appState.timerTotalMs = totalMs;
+  appState.timerLastTickSecond = null;
+  els.timerLabel.textContent = label;
+
+  if (appState.timerInterval) clearInterval(appState.timerInterval);
+  appState.timerInterval = setInterval(updateTimerUI, 50);
+  updateTimerUI();
+}
+
+function clearTimer() {
+  appState.timerMode = null;
+  appState.timerEndsAt = null;
+  appState.timerTotalMs = null;
+  appState.timerLastTickSecond = null;
+  if (appState.timerInterval) clearInterval(appState.timerInterval);
+  appState.timerInterval = null;
+  els.timerValue.textContent = '--.-s';
+  els.timerBar.style.width = '0%';
+}
+
+function updateTimerUI() {
+  if (!appState.timerEndsAt || !appState.timerTotalMs) {
+    clearTimer();
+    return;
+  }
+
+  const remain = Math.max(0, appState.timerEndsAt - Date.now());
+  const pct = Math.max(0, Math.min(1, remain / appState.timerTotalMs));
+  els.timerBar.style.width = `${pct * 100}%`;
+  els.timerValue.textContent = `${(remain / 1000).toFixed(1)}s`;
+
+  if (appState.timerMode === 'draw' && remain <= 3000) {
+    const second = Math.ceil(remain / 1000);
+    if (second > 0 && second !== appState.timerLastTickSecond) {
+      appState.timerLastTickSecond = second;
+      playTick();
     }
+  }
 
-    const roleText = player.role ? (player.role === 'imposter' ? 'Imposter' : 'Artist') : '???';
-    const hostText = player.isHost ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-400/40">Host</span>' : '';
+  if (remain === 0) clearTimer();
+}
+
+function renderLegend() {
+  const players = appState.roomState?.drawingLegend || [];
+  els.legend.innerHTML = '';
+  for (const player of players) {
+    const item = document.createElement('div');
+    item.className = 'text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-900/80';
+    item.innerHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle" style="background:${player.color}"></span>${player.nickname}`;
+    els.legend.appendChild(item);
+  }
+}
+
+function renderPlayers() {
+  const players = appState.roomState?.players || [];
+  els.playersList.innerHTML = '';
+
+  for (const player of players) {
+    const active = appState.roomState?.activePlayerId === player.id;
+    const card = document.createElement('div');
+    card.className = `rounded-xl border px-3 py-2.5 transition ${active ? 'shadow-neonCyan border-cyan-400/60 bg-cyan-500/10 pulse' : 'border-slate-700 bg-slate-900/70'}`;
 
     card.innerHTML = `
       <div class="flex items-center justify-between gap-2">
-        <div>
-          <div class="font-semibold ${isMe ? 'text-cyan-300' : 'text-slate-100'}">${player.nickname} ${isMe ? '(Du)' : ''}</div>
-          <div class="text-xs text-slate-400">Punkte: ${player.score} · Rolle: ${roleText}</div>
+        <div class="font-medium flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${player.color}"></span>
+          <span>${player.nickname}</span>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="w-4 h-4 rounded-full border border-slate-400/70" style="background:${player.color}"></span>
-          ${hostText}
-        </div>
+        <div class="text-xs text-slate-300">${player.score} pts</div>
+      </div>
+      <div class="mt-1 text-[11px] ${player.isHost ? 'text-amber-300' : 'text-slate-400'}">${player.isHost ? 'HOST' : active ? 'AKTIVER ZUG' : 'SPIELER'}</div>
+    `;
+    els.playersList.appendChild(card);
+  }
+}
+
+function renderVoteCards() {
+  const players = appState.roomState?.players || [];
+  const voteCounts = new Map((appState.roomState?.voteCounts || []).map((entry) => [entry.targetId, entry.count]));
+  els.voteCards.innerHTML = '';
+
+  for (const player of players) {
+    const btn = document.createElement('button');
+    const selected = appState.myVoteTarget === player.id;
+    btn.className = `w-full text-left rounded-xl border px-3 py-2 ${selected ? 'border-rose-400/70 bg-rose-500/15 shadow-neonRose' : 'border-slate-700 bg-slate-900/70 hover:border-rose-400/50'}`;
+    btn.innerHTML = `
+      <div class="flex items-center justify-between">
+        <span><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background:${player.color}"></span>${player.nickname}</span>
+        <span class="text-xs text-slate-300">${voteCounts.get(player.id) || 0} Votes</span>
       </div>
     `;
-
-    if (state.activePlayerId === player.id && state.phase === 'drawing') {
-      card.classList.add('neon-emerald');
-    }
-
-    els.playersList.appendChild(card);
-  });
+    btn.addEventListener('click', () => {
+      if (appState.roomState?.phase !== 'voting') return;
+      appState.myVoteTarget = player.id;
+      socket.emit('castVote', { targetId: player.id });
+      renderVoteCards();
+    });
+    els.voteCards.appendChild(btn);
+  }
 }
 
-function startTimer({ durationMs, endAt, label, kind }) {
-  currentTimerKind = kind;
-  tickSoundMarks = new Set();
+function updateRolePanel() {
+  const role = appState.roleInfo;
+  els.categoryText.textContent = role.category || '-';
+  els.wordText.textContent = role.isImposter ? '???' : role.word || '-';
+  els.imposterBadge.classList.toggle('hidden', !role.isImposter || appState.roomState?.phase === 'lobby');
+}
 
-  if (timerAnim) cancelAnimationFrame(timerAnim);
-  els.timerLabel.textContent = label;
+function phaseStatusText() {
+  const phase = appState.roomState?.phase;
+  if (!phase) return 'Warte auf Verbindung...';
 
-  const loop = () => {
-    const now = Date.now();
-    const remaining = Math.max(0, endAt - now);
-    const progress = 1 - remaining / durationMs;
-    const pct = Math.max(0, Math.min(100, progress * 100));
-    els.timerBar.style.width = `${pct}%`;
+  if (phase === 'lobby') {
+    return `Lobby: ${appState.roomState.players.length}/${appState.roomState.minPlayers} Spieler`;
+  }
 
-    const color = remaining > durationMs * 0.66
-      ? '#34d399'
-      : remaining > durationMs * 0.33
-        ? '#fbbf24'
-        : '#f87171';
-    els.timerBar.style.backgroundColor = color;
+  if (phase === 'drawing') {
+    const active = appState.roomState.players.find((p) => p.id === appState.roomState.activePlayerId);
+    if (!active) return 'Zeichenphase läuft';
+    if (active.id === appState.myId) return 'Du bist dran: Setze den ersten Strich für den 3-Sekunden-Countdown!';
+    return `${active.nickname} ist am Zug`;
+  }
 
-    if (remaining <= 3000) {
-      els.timerWrap.classList.add('pulse');
-      const sec = Math.ceil(remaining / 1000);
-      if (kind === 'turn' && sec > 0 && !tickSoundMarks.has(sec)) {
-        tickSoundMarks.add(sec);
-        playUrgentTick();
-      }
+  if (phase === 'voting') {
+    return `Voting läuft: ${appState.roomState.votesSubmitted}/${appState.roomState.totalVotesExpected} Stimmen`;
+  }
+
+  if (phase === 'showdown') {
+    return 'Imposter-Showdown läuft';
+  }
+
+  if (phase === 'ended') {
+    const result = appState.roomState.result;
+    if (!result) return 'Runde beendet';
+    if (result.outcome === 'imposter_victory') return 'Imposter Victory Screen: Der Imposter hat euch ausgetrickst!';
+    if (result.outcome === 'heist_win') return 'Heist Win: Der Imposter hat das geheime Wort erraten!';
+    return 'Artists Win: Der Imposter wurde gestoppt!';
+  }
+
+  return 'Spielstatus wird synchronisiert...';
+}
+
+function updatePhasePanels() {
+  const phase = appState.roomState?.phase;
+  const me = getMyPlayer();
+  const isHost = me && appState.roomState?.hostId === me.id;
+
+  els.startBtn.classList.toggle('hidden', phase !== 'lobby' || !isHost);
+  els.playAgainBtn.classList.toggle('hidden', phase !== 'ended' || !isHost);
+  els.votePanel.classList.toggle('hidden', phase !== 'voting');
+  els.showdownPanel.classList.toggle('hidden', phase !== 'showdown' && phase !== 'ended');
+
+  if (phase === 'drawing') {
+    if (appState.roomState.turnEndsAt) {
+      startTimer('draw', appState.roomState.turnEndsAt, 3000, '3-Sekunden-Timer');
     } else {
-      els.timerWrap.classList.remove('pulse');
+      clearTimer();
+      els.timerLabel.textContent = '3-Sekunden-Timer';
     }
+  } else if (phase === 'voting') {
+    if (appState.roomState.voteEndsAt) {
+      startTimer('vote', appState.roomState.voteEndsAt, 30000, 'Voting-Timer');
+    }
+  } else if (phase === 'showdown') {
+    if (appState.roomState.showdownEndsAt) {
+      startTimer('showdown', appState.roomState.showdownEndsAt, 15000, 'Showdown-Timer');
+    }
+  } else {
+    clearTimer();
+  }
 
-    els.timerText.textContent = `${(remaining / 1000).toFixed(1)}s`;
-
-    if (remaining > 0) {
-      timerAnim = requestAnimationFrame(loop);
+  if (phase === 'showdown') {
+    if (appState.roleInfo.isImposter) {
+      els.showdownText.textContent = 'Du wurdest enttarnt! Rate jetzt das geheime Wort in 15 Sekunden.';
+      els.guessWrap.classList.remove('hidden');
     } else {
-      els.timerWrap.classList.remove('pulse');
-      currentTimerKind = null;
+      els.showdownText.textContent = 'Der Imposter hat 15 Sekunden, um das geheime Wort zu erraten...';
+      els.guessWrap.classList.add('hidden');
     }
-  };
+  } else {
+    els.guessWrap.classList.add('hidden');
+  }
 
-  timerAnim = requestAnimationFrame(loop);
-}
-
-function setDrawingAvailability() {
-  state.canDraw = state.phase === 'drawing' && state.activePlayerId === me.id;
-  if (state.canDraw) {
-    setStatus('Du bist dran – setze den ersten Strich, dann laufen 3 Sekunden.');
+  if (phase === 'ended') {
+    const result = appState.roomState.result;
+    let text = 'Runde beendet.';
+    if (result?.outcome === 'imposter_victory') text = 'Imposter Victory Screen';
+    if (result?.outcome === 'heist_win') text = 'Heist Win';
+    if (result?.outcome === 'artists_win') text = 'Artists Win';
+    els.showdownText.textContent = `${text} | Geheimes Wort: ${result?.word || '-'}`;
   }
 }
 
-function updateButtons() {
-  const amHost = state.hostId === me.id;
-  const enoughPlayers = state.players.length >= 3;
+function renderState() {
+  if (!appState.roomState) return;
 
-  els.startBtn.disabled = !(amHost && state.phase === 'lobby' && enoughPlayers);
-  els.startBtn.classList.toggle('opacity-40', els.startBtn.disabled);
-
-  const showPlayAgain = state.phase === 'result';
-  els.playAgainBtn.classList.toggle('hidden', !showPlayAgain);
+  els.roomCodeDisplay.textContent = appState.roomCode || '----';
+  setStatus(phaseStatusText());
+  renderLegend();
+  renderPlayers();
+  renderVoteCards();
+  updateRolePanel();
+  updatePhasePanels();
 }
 
-els.createBtn.addEventListener('click', () => {
-  initAudio();
-  socket.emit('join_room', {
-    nickname: els.nicknameInput.value,
-    roomCode: ''
-  });
-});
-
-els.joinBtn.addEventListener('click', () => {
-  initAudio();
-  socket.emit('join_room', {
-    nickname: els.nicknameInput.value,
-    roomCode: els.roomInput.value
-  });
-});
-
-els.inviteBtn.addEventListener('click', async () => {
-  const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
-  try {
-    await navigator.clipboard.writeText(url);
-    setStatus('Invite Link kopiert.');
-  } catch {
-    setStatus(`Invite Link: ${url}`);
-  }
-});
-
-els.startBtn.addEventListener('click', () => {
-  initAudio();
-  socket.emit('start_game');
-});
-
-els.playAgainBtn.addEventListener('click', () => {
-  socket.emit('play_again');
-  setStatus('Play Again angefragt...');
-});
-
-els.guessBtn.addEventListener('click', () => {
-  socket.emit('submit_guess', { guess: els.guessInput.value });
-  els.guessInput.value = '';
-});
-
-els.drawCanvas.addEventListener('pointerdown', (evt) => {
-  initAudio();
-  if (!state.canDraw) return;
-
-  isPointerDown = true;
-  const point = normalizePointFromEvent(evt);
-  socket.emit('drawing_point', { ...point, isNewStroke: true });
-  playPop();
-});
-
-els.drawCanvas.addEventListener('pointermove', (evt) => {
-  if (!isPointerDown || !state.canDraw) return;
-  const point = normalizePointFromEvent(evt);
-  socket.emit('drawing_point', { ...point, isNewStroke: false });
-  playPop();
-});
-
-function releasePointer() {
-  if (!isPointerDown) return;
-  isPointerDown = false;
-  if (state.canDraw) socket.emit('stroke_end');
-}
-
-els.drawCanvas.addEventListener('pointerup', releasePointer);
-els.drawCanvas.addEventListener('pointercancel', releasePointer);
-els.drawCanvas.addEventListener('pointerleave', () => {
-  if (isPointerDown && state.canDraw) {
-    socket.emit('stroke_end');
-    isPointerDown = false;
-  }
-});
-
-socket.on('connect', () => {
-  me.id = socket.id;
-});
-
-socket.on('join_error', ({ message }) => {
-  els.lobbyError.textContent = message;
-});
-
-socket.on('room_joined', ({ code, hostId }) => {
-  roomCode = code;
-  state.hostId = hostId;
-  els.roomCodeLabel.textContent = code;
+function joinSuccess(roomCode, playerId) {
+  appState.roomCode = roomCode;
+  appState.myId = playerId;
   els.lobbyPanel.classList.add('hidden');
   els.gamePanel.classList.remove('hidden');
-  els.lobbyError.textContent = '';
-
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set('room', code);
-  window.history.replaceState({}, '', nextUrl);
-
-  setStatus('Raum beigetreten. Warte auf den Host.');
-  updateButtons();
-});
-
-socket.on('host_changed', ({ hostId }) => {
-  state.hostId = hostId;
-  updateButtons();
-  updatePlayersList();
-});
-
-socket.on('room_state', ({ phase, players, playAgainVotes, replayEvents }) => {
-  state.phase = phase;
-  state.players = players;
-  state.replayEvents = replayEvents || [];
-  updatePlayersList();
-  updateButtons();
-  redrawReplay();
-
-  if (phase === 'result') {
-    setStatus(`Runde beendet. Play Again Votes: ${playAgainVotes}/${players.length}`);
-  }
-});
-
-socket.on('role_info', ({ role, category, word, warning }) => {
-  me.role = role;
-  me.category = category;
-  me.word = word;
-  updateRolePanel();
-
-  if (warning) {
-    setStatus(warning);
-  }
-});
-
-socket.on('phase_change', ({ phase, message }) => {
-  state.phase = phase;
-  state.votedFor = null;
-  setDrawingAvailability();
-  updateButtons();
-  updatePlayersList();
-  setStatus(message);
-  playGong();
-
-  const showGuess = phase === 'guessing' && me.role === 'imposter';
-  els.guessPanel.classList.toggle('hidden', !showGuess);
-});
-
-socket.on('turn_started', ({ activePlayerId, round, currentTurn, totalTurns }) => {
-  state.activePlayerId = activePlayerId;
-  setDrawingAvailability();
-  updatePlayersList();
-  const activePlayer = state.players.find((p) => p.id === activePlayerId);
-  setStatus(`Runde ${round}/2 · Zug ${currentTurn}/${totalTurns}: ${activePlayer?.nickname || 'Spieler'} ist aktiv.`);
-});
-
-socket.on('turn_ended', ({ reason }) => {
-  if (reason === 'player_left') {
-    setStatus('Aktiver Spieler hat verlassen. Nächster Zug startet.');
-  }
-});
-
-socket.on('timer_started', (payload) => {
-  startTimer(payload);
-});
-
-socket.on('drawing_point', (point) => {
-  state.replayEvents.push(point);
-  drawNormalizedPoint(point);
-});
-
-socket.on('vote_update', ({ votedPlayers }) => {
-  setStatus(`Votes eingegangen: ${votedPlayers.length}/${state.players.length}`);
-});
-
-socket.on('showdown_result', ({ title, subtitle, secretWord, imposterId }) => {
-  state.phase = 'result';
-  updateButtons();
-  updatePlayersList();
-  const imposterName = state.players.find((p) => p.id === imposterId)?.nickname || 'Unbekannt';
-  setStatus(`${title} — ${subtitle} | Wort: ${secretWord} | Imposter: ${imposterName}`);
-  els.guessPanel.classList.add('hidden');
-  playGong();
-});
-
-socket.on('reset_canvas', () => {
-  state.replayEvents = [];
-  clearCanvas();
-  setStatus('Neue Runde gestartet.');
-});
-
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('pointerdown', initAudio, { once: true });
-
-const roomFromUrl = new URL(window.location.href).searchParams.get('room');
-if (roomFromUrl) {
-  els.roomInput.value = roomFromUrl.slice(0, 4);
+  setLobbyError('');
+  socket.emit('requestCanvasSync');
 }
 
-resizeCanvas();
-updateRolePanel();
-setStatus('Willkommen bei SABOTAGE CANVAS.');
+function tryCreateRoom() {
+  ensureAudio();
+  const nickname = sanitizeNickname(els.nicknameInput.value);
+  if (!nickname) {
+    setLobbyError('Bitte gib einen Nickname ein.');
+    return;
+  }
+  socket.emit('createRoom', { nickname });
+}
+
+function tryJoinRoom() {
+  ensureAudio();
+  const nickname = sanitizeNickname(els.nicknameInput.value);
+  const roomCode = sanitizeCode(els.roomInput.value);
+  if (!nickname || roomCode.length !== 4) {
+    setLobbyError('Bitte Nickname und 4-stelligen Code eingeben.');
+    return;
+  }
+  socket.emit('joinRoom', { nickname, roomCode });
+}
+
+function copyInviteLink() {
+  if (!appState.roomCode) return;
+  const url = `${window.location.origin}${window.location.pathname}?room=${appState.roomCode}`;
+  navigator.clipboard.writeText(url).then(() => {
+    setStatus('Invite Link kopiert.');
+  }).catch(() => {
+    setStatus(url);
+  });
+}
+
+function attachCanvasInput() {
+  const onDown = (event) => {
+    ensureAudio();
+    if (!canDraw()) return;
+    event.preventDefault();
+    appState.pointerDown = true;
+    sendPoint(event, true);
+  };
+
+  const onMove = (event) => {
+    if (!appState.pointerDown || !canDraw()) return;
+    event.preventDefault();
+    sendPoint(event, false);
+  };
+
+  const onUp = () => {
+    if (!appState.pointerDown) return;
+    appState.pointerDown = false;
+    socket.emit('strokeEnd');
+  };
+
+  els.canvas.addEventListener('pointerdown', onDown);
+  els.canvas.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  els.canvas.addEventListener('pointercancel', onUp);
+  els.canvas.addEventListener('pointerleave', (event) => {
+    if (appState.pointerDown) onMove(event);
+  });
+}
+
+function bindEvents() {
+  els.roomInput.addEventListener('input', () => {
+    els.roomInput.value = sanitizeCode(els.roomInput.value);
+  });
+
+  els.createRoomBtn.addEventListener('click', tryCreateRoom);
+  els.joinRoomBtn.addEventListener('click', tryJoinRoom);
+  els.inviteBtn.addEventListener('click', copyInviteLink);
+
+  els.startBtn.addEventListener('click', () => {
+    ensureAudio();
+    socket.emit('startGame');
+  });
+
+  els.playAgainBtn.addEventListener('click', () => {
+    ensureAudio();
+    socket.emit('playAgain');
+  });
+
+  els.submitGuessBtn.addEventListener('click', () => {
+    ensureAudio();
+    const guess = els.guessInput.value.trim();
+    if (!guess) return;
+    socket.emit('submitImposterGuess', { guess });
+    els.guessInput.value = '';
+  });
+
+  els.guessInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      els.submitGuessBtn.click();
+    }
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  const roomFromUrl = sanitizeCode(params.get('room') || '');
+  if (roomFromUrl.length === 4) els.roomInput.value = roomFromUrl;
+
+  attachCanvasInput();
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+}
+
+socket.on('connect', () => {
+  els.connectionDot.textContent = 'Online';
+  els.connectionDot.className = 'px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/70 text-xs uppercase tracking-wider text-emerald-200';
+});
+
+socket.on('disconnect', () => {
+  els.connectionDot.textContent = 'Offline';
+  els.connectionDot.className = 'px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/70 text-xs uppercase tracking-wider text-rose-200';
+});
+
+socket.on('joinedRoom', ({ roomCode, playerId }) => {
+  joinSuccess(roomCode, playerId);
+});
+
+socket.on('roomState', (roomState) => {
+  appState.roomState = roomState;
+  renderState();
+});
+
+socket.on('roleInfo', (roleInfo) => {
+  appState.roleInfo = roleInfo;
+  updateRolePanel();
+});
+
+socket.on('drawPoint', (stroke) => {
+  appState.strokes.push(stroke);
+  drawStroke(stroke);
+});
+
+socket.on('canvasReset', () => {
+  appState.strokes = [];
+  clearCanvas();
+});
+
+socket.on('canvasSnapshot', (strokes) => {
+  appState.strokes = Array.isArray(strokes) ? strokes : [];
+  redrawAllStrokes();
+});
+
+socket.on('phaseChanged', () => {
+  playGong();
+});
+
+socket.on('systemMessage', (message) => {
+  setStatus(message);
+});
+
+socket.on('errorMessage', (message) => {
+  if (!appState.roomCode) setLobbyError(message);
+  else setStatus(message);
+});
+
+bindEvents();
