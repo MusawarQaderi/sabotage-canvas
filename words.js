@@ -165,7 +165,7 @@ const WORD_BANK = [
   { category: 'Architektur', word: 'Säulentempel', hints: ['Säulen', 'Antike', 'Griechisch'] },
   { category: 'Architektur', word: 'Kuppeldach', hints: ['Rund', 'Gewölbe', 'Spitze'] },
   { category: 'Architektur', word: 'Fachwerkhaus', hints: ['Holz', 'Fach', 'Deutsch'] },
-  { category: 'Architektur', word: 'Leuchtturm', hints: ['Meer', 'Warnung', 'Turm'] },
+  { category: 'Architektur', word: 'Torburg', hints: ['Tor', 'Mauer', 'Durchlass'] },
   { category: 'Architektur', word: 'Hängebrücke', hints: ['Seile', 'Tiefe', 'Schwung'] },
   { category: 'Architektur', word: 'Kirchturm', hints: ['Glocke', 'Spitze', 'Dorf'] },
   { category: 'Architektur', word: 'Stadttor', hints: ['Mauer', 'Durchgang', 'Wappen'] },
@@ -180,7 +180,112 @@ const WORD_BANK = [
   { category: 'Fantasy', word: 'Meerjungfrau', hints: ['Fischschwanz', 'Schönheit', 'Meer'] },
   { category: 'Fantasy', word: 'Riese', hints: ['Groß', 'Stark', 'Märchen'] },
   { category: 'Fantasy', word: 'Troll', hints: ['Brücke', 'Hässlich', 'Nacht'] },
-  { category: 'Fantasy', word: 'Weihnachtsmann', hints: ['Rot', 'Geschenke', 'Schlitten'] }
+  { category: 'Fantasy', word: 'Weihnachtsmann', hints: ['Rot', 'Geschenke', 'Schlitten'] },
+
+  // ── Tiere: Erweiterung ──
+  { category: 'Tiere', word: 'Ameise', hints: ['Insekt', 'Organisiert', 'Stark'] },
+  { category: 'Tiere', word: 'Biber', hints: ['Damm', 'Schwanz', 'Nager'] },
+  { category: 'Tiere', word: 'Dachs', hints: ['Gräber', 'Schwarz-Weiß', 'Nacht'] },
+  { category: 'Tiere', word: 'Eisbär', hints: ['Weiß', 'Arktis', 'Kälte'] },
+  { category: 'Tiere', word: 'Faultier', hints: ['Langsam', 'Baum', 'Hängend'] },
+  { category: 'Tiere', word: 'Grashüpfer', hints: ['Springen', 'Beine', 'Wiese'] },
+  { category: 'Tiere', word: 'Hai', hints: ['Zähne', 'Meer', 'Rückenflosse'] },
+  { category: 'Tiere', word: 'Krokodil', hints: ['Zähne', 'Sumpf', 'Panzer'] },
+  { category: 'Tiere', word: 'Maulwurf', hints: ['Untergrund', 'Gräbt', 'Blind'] },
+  { category: 'Tiere', word: 'Pfau', hints: ['Rad', 'Feder', 'Farben'] },
+  { category: 'Tiere', word: 'Raupe', hints: ['Kriecht', 'Schmetterling', 'Beine'] },
+  { category: 'Tiere', word: 'Seelöwe', hints: ['Bellen', 'Flossen', 'Küste'] },
+  { category: 'Tiere', word: 'Storch', hints: ['Schnabel', 'Nest', 'Baby'] },
+  { category: 'Tiere', word: 'Tausendfüßler', hints: ['Beine', 'Kriecht', 'Rollen'] },
+  { category: 'Tiere', word: 'Zikade', hints: ['Summen', 'Flügel', 'Baum'] },
+
+  // ── Fahrzeuge: Erweiterung ──
+  { category: 'Fahrzeuge', word: 'Bulldozer', hints: ['Schieben', 'Raupen', 'Bau'] },
+  { category: 'Fahrzeuge', word: 'Pferd', hints: ['Reittier', 'Sattel', 'Galopp'] },
+  { category: 'Fahrzeuge', word: 'E-Scooter', hints: ['Elektrisch', 'Stehend', 'Stadt'] },
+  { category: 'Fahrzeuge', word: 'Pferdekutsche', hints: ['Pferde', 'Räder', 'Früher'] },
+  { category: 'Fahrzeuge', word: 'Schlitten', hints: ['Schnee', 'Kufen', 'Winter'] },
+  { category: 'Fahrzeuge', word: 'Straßenbahn', hints: ['Schienen', 'Stadt', 'Strom'] },
+  { category: 'Fahrzeuge', word: 'Mofa', hints: ['Motor', 'Fahrrad', 'Klein'] },
+  { category: 'Fahrzeuge', word: 'Hecklader', hints: ['Müll', 'Hinten', 'Lift'] },
+  { category: 'Fahrzeuge', word: 'Golfmobil', hints: ['Platz', 'Akku', 'Klein'] },
+  { category: 'Fahrzeuge', word: 'Waggong', hints: ['Schienen', 'Zug', 'Güter'] },
+
+  // ── Essen: Erweiterung ──
+  { category: 'Essen', word: 'Currywurst', hints: ['Wurst', 'Soße', 'Berlin'] },
+  { category: 'Essen', word: 'Maultasche', hints: ['Teigtasche', 'Schwaben', 'Füllung'] },
+  { category: 'Essen', word: 'Kaiserschmarrn', hints: ['Süß', 'Zerrissen', 'Österreich'] },
+  { category: 'Essen', word: 'Raclette', hints: ['Käse', 'Schmelzen', 'Winter'] },
+  { category: 'Essen', word: 'Fondue', hints: ['Käse', 'Topf', 'Spießen'] },
+  { category: 'Essen', word: 'Crème Brûlée', hints: ['Creme', 'Karamell', 'Französisch'] },
+  { category: 'Essen', word: 'Mango', hints: ['Tropen', 'Orange', 'Stein'] },
+  { category: 'Essen', word: 'Marzipan', hints: ['Mandel', 'Süß', 'Lübeck'] },
+  { category: 'Essen', word: 'Pretzel', hints: ['Knoten', 'Lauge', 'Salz'] },
+  { category: 'Essen', word: 'Tiramisu', hints: ['Kaffee', 'Italien', 'Schicht'] },
+
+  // ── Berufe: Erweiterung ──
+  { category: 'Berufe', word: 'Bäcker', hints: ['Brot', 'Ofen', 'Morgen'] },
+  { category: 'Berufe', word: 'Metzger', hints: ['Fleisch', 'Wurst', 'Messer'] },
+  { category: 'Berufe', word: 'Zahnarzt', hints: ['Zähne', 'Bohrer', 'Stuhl'] },
+  { category: 'Berufe', word: 'Friseur', hints: ['Haare', 'Schere', 'Stuhl'] },
+  { category: 'Berufe', word: 'Maurer', hints: ['Steine', 'Mörtel', 'Mauer'] },
+  { category: 'Berufe', word: 'Dachdecker', hints: ['Dach', 'Leiter', 'Höhe'] },
+  { category: 'Berufe', word: 'Bestatter', hints: ['Tod', 'Sarg', 'Trauer'] },
+  { category: 'Berufe', word: 'Kürschner', hints: ['Pelz', 'Fell', 'Mantel'] },
+  { category: 'Berufe', word: 'Steinmetz', hints: ['Stein', 'Meißel', 'Skulptur'] },
+  { category: 'Berufe', word: 'Notar', hints: ['Urkunde', 'Stempel', 'Vertrag'] },
+
+  // ── Orte: Erweiterung ──
+  { category: 'Orte', word: 'Marktplatz', hints: ['Brunnen', 'Stadt', 'Treffen'] },
+  { category: 'Orte', word: 'Bahnhof', hints: ['Züge', 'Gleise', 'Reise'] },
+  { category: 'Orte', word: 'Friedhof', hints: ['Gräber', 'Stille', 'Trauer'] },
+  { category: 'Orte', word: 'Freibad', hints: ['Schwimmen', 'Sommer', 'Becken'] },
+  { category: 'Orte', word: 'Krankenhaus', hints: ['Kranke', 'Weiß', 'Notaufnahme'] },
+  { category: 'Orte', word: 'Rathaus', hints: ['Bürgermeister', 'Standesamt', 'Stadt'] },
+  { category: 'Orte', word: 'Stadion', hints: ['Sport', 'Tribüne', 'Rund'] },
+  { category: 'Orte', word: 'Hafen', hints: ['Schiffe', 'Kran', 'Container'] },
+  { category: 'Orte', word: 'Kirmes', hints: ['Karussell', 'Buden', 'Jahrmarkt'] },
+  { category: 'Orte', word: 'Bauernhof', hints: ['Tiere', 'Feld', 'Scheune'] },
+
+  // ── Objekte: Erweiterung ──
+  { category: 'Objekte', word: 'Briefmarke', hints: ['Post', 'Kleber', 'Zähnung'] },
+  { category: 'Objekte', word: 'Korkenzieher', hints: ['Korken', 'Drehen', 'Wein'] },
+  { category: 'Objekte', word: 'Schneeschuh', hints: ['Schnee', 'Laufen', 'Breit'] },
+  { category: 'Objekte', word: 'Federboa', hints: ['Federn', 'Tanz', 'Lang'] },
+  { category: 'Objekte', word: 'Kaffeemühle', hints: ['Bohnen', 'Drehen', 'Pulver'] },
+  { category: 'Objekte', word: 'Nussknacker', hints: ['Nüsse', 'Kiefer', 'Holz'] },
+  { category: 'Objekte', word: 'Dosenöffner', hints: ['Dose', 'Schneiden', 'Küche'] },
+  { category: 'Objekte', word: 'Kleiderbügel', hints: ['Kleidung', 'Schrank', 'Haken'] },
+  { category: 'Objekte', word: 'Schuhlöffel', hints: ['Schuh', 'Fuß', 'Hinein'] },
+  { category: 'Objekte', word: 'Schirm', hints: ['Regen', 'Stoff', 'Stab'] },
+
+  // ── Sport: Erweiterung ──
+  { category: 'Sport', word: 'Frisbee', hints: ['Werfen', 'Scheibe', 'Fliegen'] },
+  { category: 'Sport', word: 'Jonglierball', hints: ['Werfen', 'Fangen', 'Drei'] },
+  { category: 'Sport', word: 'Hula-Hoop-Reifen', hints: ['Hüfte', 'Kreisen', 'Plastik'] },
+  { category: 'Sport', word: 'Diabolo', hints: ['Stöcke', 'Spinnen', 'Werfen'] },
+  { category: 'Sport', word: 'Pogo-Stick', hints: ['Springen', 'Stange', 'Aufrecht'] },
+
+  // ── Natur: Erweiterung ──
+  { category: 'Natur', word: 'Morserschlucht', hints: ['Klamm', 'Wasser', 'Eng'] },
+  { category: 'Natur', word: 'Geysir', hints: ['Wasser', 'Ausbruch', 'Heiß'] },
+  { category: 'Natur', word: 'Koralleninsel', hints: ['Atoll', 'Riff', 'Sand'] },
+  { category: 'Natur', word: 'Mondfinsternis', hints: ['Schatten', 'Erde', 'Rot'] },
+  { category: 'Natur', word: 'Stalagmit', hints: ['Höhle', 'Wächst', 'Boden'] },
+
+  // ── Architektur: Erweiterung ──
+  { category: 'Architektur', word: 'Burggraben', hints: ['Wasser', 'Brücke', 'Schutz'] },
+  { category: 'Architektur', word: 'Zinnen', hints: ['Mauer', 'Zacken', 'Oben'] },
+  { category: 'Architektur', word: 'Turmspitze', hints: ['Oben', 'Spitz', 'Turm'] },
+  { category: 'Architektur', word: 'Bogenfenster', hints: ['Rund', 'Fenster', 'Bogen'] },
+  { category: 'Architektur', word: 'Stützbogen', hints: ['Stützen', 'Bogen', 'Mauer'] },
+
+  // ── Fantasy: Erweiterung ──
+  { category: 'Fantasy', word: 'Witch', hints: ['Hexe', 'Besen', 'Kessel'] },
+  { category: 'Fantasy', word: 'Vampir', hints: ['Blut', 'Fledermaus', 'Nacht'] },
+  { category: 'Fantasy', word: 'Werwolf', hints: ['Wolf', 'Mond', 'Verwandlung'] },
+  { category: 'Fantasy', word: 'Geist', hints: ['Tot', 'Durchsichtig', 'Spuk'] },
+  { category: 'Fantasy', word: 'Golem', hints: ['Ton', 'Lehm', 'Beschützt'] }
 ];
 
 module.exports = WORD_BANK;

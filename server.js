@@ -77,25 +77,17 @@ function assignRoundSecrets(room) {
 
 function computeImposterHints(room) {
   const hintsRevealed = [];
-  if (room.category) hintsRevealed.push(room.category);
-  if (room.phase === 'drawing' && room.hints) {
-    const turnsElapsed = room.turnNumber || 0;
-    const totalTurns = room.totalTurns || 1;
-    const hintThresholds = [
-      Math.floor(totalTurns * 0.33),
-      Math.floor(totalTurns * 0.66)
-    ];
-    if (turnsElapsed >= hintThresholds[0] && room.hints[0]) hintsRevealed.push(room.hints[0]);
-    if (turnsElapsed >= hintThresholds[1] && room.hints[1]) hintsRevealed.push(room.hints[1]);
-  }
-  if (room.phase === 'voting' && room.hints) {
-    if (room.hints[0]) hintsRevealed.push(room.hints[0]);
-    if (room.hints[1]) hintsRevealed.push(room.hints[1]);
-  }
-  if ((room.phase === 'showdown' || room.phase === 'ended') && room.hints) {
-    if (room.hints[0]) hintsRevealed.push(room.hints[0]);
-    if (room.hints[1]) hintsRevealed.push(room.hints[1]);
-    if (room.hints[2]) hintsRevealed.push(room.hints[2]);
+  if (room.category) hintsRevealed.push(`Kategorie: ${room.category}`);
+  if (room.phase === 'lobby') return [...new Set(hintsRevealed)];
+  const round = room.roundNumber || 1;
+  if (room.hints) {
+    if (round >= 2 && room.hints[0]) hintsRevealed.push(room.hints[0]);
+    if (room.phase === 'voting' || room.phase === 'showdown' || room.phase === 'ended') {
+      if (room.hints[1]) hintsRevealed.push(room.hints[1]);
+    }
+    if (room.phase === 'showdown' || room.phase === 'ended') {
+      if (room.hints[2]) hintsRevealed.push(room.hints[2]);
+    }
   }
   return [...new Set(hintsRevealed)];
 }

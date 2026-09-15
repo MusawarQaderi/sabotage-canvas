@@ -149,6 +149,7 @@ function showView(name) {
   els.landingView.classList.toggle('hidden', name !== 'landing');
   els.lobbyView.classList.toggle('hidden', name !== 'lobby');
   els.gameView.classList.toggle('hidden', name !== 'game');
+  if (name === 'game') requestAnimationFrame(() => resizeCanvas());
 }
 
 function resizeCanvas() {
@@ -171,7 +172,22 @@ function clearCanvas() {
 
 function redrawAllStrokes() {
   clearCanvas();
-  for (const stroke of appState.strokes) drawStroke(stroke);
+  if (!appState.cssWidth || !appState.cssHeight || !appState.strokes.length) return;
+  let currentColor = null;
+  for (const stroke of appState.strokes) {
+    const x = stroke.x * appState.cssWidth;
+    const y = stroke.y * appState.cssHeight;
+    if (stroke.isNewStroke || currentColor !== stroke.color) {
+      if (currentColor !== null) ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.strokeStyle = stroke.color;
+      currentColor = stroke.color;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  if (currentColor !== null) ctx.stroke();
 }
 
 function drawStroke(stroke) {
