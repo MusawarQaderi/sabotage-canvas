@@ -33,6 +33,7 @@ const els = {
 };
 
 const ctx = els.canvas.getContext('2d');
+
 const appState = {
   myId: null,
   roomCode: null,
@@ -63,15 +64,12 @@ function playTone({ freq, duration, type = 'sine', gain = 0.05, rampTo = null })
   const now = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
-
   osc.type = type;
   osc.frequency.setValueAtTime(freq, now);
   if (rampTo) osc.frequency.exponentialRampToValueAtTime(rampTo, now + duration);
-
   gainNode.gain.setValueAtTime(0.0001, now);
   gainNode.gain.exponentialRampToValueAtTime(gain, now + 0.01);
   gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
   osc.connect(gainNode);
   gainNode.connect(audioCtx.destination);
   osc.start(now);
@@ -196,7 +194,6 @@ function startTimer(mode, endsAt, totalMs, label) {
   appState.timerTotalMs = totalMs;
   appState.timerLastTickSecond = null;
   els.timerLabel.textContent = label;
-
   if (appState.timerInterval) clearInterval(appState.timerInterval);
   appState.timerInterval = setInterval(updateTimerUI, 50);
   updateTimerUI();
@@ -218,12 +215,10 @@ function updateTimerUI() {
     clearTimer();
     return;
   }
-
   const remain = Math.max(0, appState.timerEndsAt - Date.now());
   const pct = Math.max(0, Math.min(1, remain / appState.timerTotalMs));
   els.timerBar.style.width = `${pct * 100}%`;
   els.timerValue.textContent = `${(remain / 1000).toFixed(1)}s`;
-
   if (appState.timerMode === 'draw' && remain <= 3000) {
     const second = Math.ceil(remain / 1000);
     if (second > 0 && second !== appState.timerLastTickSecond) {
@@ -231,7 +226,6 @@ function updateTimerUI() {
       playTick();
     }
   }
-
   if (remain === 0) clearTimer();
 }
 
@@ -249,12 +243,10 @@ function renderLegend() {
 function renderPlayers() {
   const players = appState.roomState?.players || [];
   els.playersList.innerHTML = '';
-
   for (const player of players) {
     const active = appState.roomState?.activePlayerId === player.id;
     const card = document.createElement('div');
     card.className = `rounded-xl border px-3 py-2.5 transition ${active ? 'shadow-neonCyan border-cyan-400/60 bg-cyan-500/10 pulse' : 'border-slate-700 bg-slate-900/70'}`;
-
     card.innerHTML = `
       <div class="flex items-center justify-between gap-2">
         <div class="font-medium flex items-center gap-2">
@@ -273,7 +265,6 @@ function renderVoteCards() {
   const players = appState.roomState?.players || [];
   const voteCounts = new Map((appState.roomState?.voteCounts || []).map((entry) => [entry.targetId, entry.count]));
   els.voteCards.innerHTML = '';
-
   for (const player of players) {
     const btn = document.createElement('button');
     const selected = appState.myVoteTarget === player.id;
@@ -304,26 +295,21 @@ function updateRolePanel() {
 function phaseStatusText() {
   const phase = appState.roomState?.phase;
   if (!phase) return 'Warte auf Verbindung...';
-
   if (phase === 'lobby') {
     return `Lobby: ${appState.roomState.players.length}/${appState.roomState.minPlayers} Spieler`;
   }
-
   if (phase === 'drawing') {
     const active = appState.roomState.players.find((p) => p.id === appState.roomState.activePlayerId);
     if (!active) return 'Zeichenphase läuft';
     if (active.id === appState.myId) return 'Du bist dran: Setze den ersten Strich für den 3-Sekunden-Countdown!';
     return `${active.nickname} ist am Zug`;
   }
-
   if (phase === 'voting') {
     return `Voting läuft: ${appState.roomState.votesSubmitted}/${appState.roomState.totalVotesExpected} Stimmen`;
   }
-
   if (phase === 'showdown') {
     return 'Imposter-Showdown läuft';
   }
-
   if (phase === 'ended') {
     const result = appState.roomState.result;
     if (!result) return 'Runde beendet';
@@ -331,7 +317,6 @@ function phaseStatusText() {
     if (result.outcome === 'heist_win') return 'Heist Win: Der Imposter hat das geheime Wort erraten!';
     return 'Artists Win: Der Imposter wurde gestoppt!';
   }
-
   return 'Spielstatus wird synchronisiert...';
 }
 
@@ -339,12 +324,10 @@ function updatePhasePanels() {
   const phase = appState.roomState?.phase;
   const me = getMyPlayer();
   const isHost = me && appState.roomState?.hostId === me.id;
-
   els.startBtn.classList.toggle('hidden', phase !== 'lobby' || !isHost);
   els.playAgainBtn.classList.toggle('hidden', phase !== 'ended' || !isHost);
   els.votePanel.classList.toggle('hidden', phase !== 'voting');
   els.showdownPanel.classList.toggle('hidden', phase !== 'showdown' && phase !== 'ended');
-
   if (phase === 'drawing') {
     if (appState.roomState.turnEndsAt) {
       startTimer('draw', appState.roomState.turnEndsAt, 3000, '3-Sekunden-Timer');
@@ -363,7 +346,6 @@ function updatePhasePanels() {
   } else {
     clearTimer();
   }
-
   if (phase === 'showdown') {
     if (appState.roleInfo.isImposter) {
       els.showdownText.textContent = 'Du wurdest enttarnt! Rate jetzt das geheime Wort in 15 Sekunden.';
@@ -375,7 +357,6 @@ function updatePhasePanels() {
   } else {
     els.guessWrap.classList.add('hidden');
   }
-
   if (phase === 'ended') {
     const result = appState.roomState.result;
     let text = 'Runde beendet.';
@@ -388,7 +369,6 @@ function updatePhasePanels() {
 
 function renderState() {
   if (!appState.roomState) return;
-
   els.roomCodeDisplay.textContent = appState.roomCode || '----';
   setStatus(phaseStatusText());
   renderLegend();
@@ -446,19 +426,16 @@ function attachCanvasInput() {
     appState.pointerDown = true;
     sendPoint(event, true);
   };
-
   const onMove = (event) => {
     if (!appState.pointerDown || !canDraw()) return;
     event.preventDefault();
     sendPoint(event, false);
   };
-
   const onUp = () => {
     if (!appState.pointerDown) return;
     appState.pointerDown = false;
     socket.emit('strokeEnd');
   };
-
   els.canvas.addEventListener('pointerdown', onDown);
   els.canvas.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
@@ -472,21 +449,17 @@ function bindEvents() {
   els.roomInput.addEventListener('input', () => {
     els.roomInput.value = sanitizeCode(els.roomInput.value);
   });
-
   els.createRoomBtn.addEventListener('click', tryCreateRoom);
   els.joinRoomBtn.addEventListener('click', tryJoinRoom);
   els.inviteBtn.addEventListener('click', copyInviteLink);
-
   els.startBtn.addEventListener('click', () => {
     ensureAudio();
     socket.emit('startGame');
   });
-
   els.playAgainBtn.addEventListener('click', () => {
     ensureAudio();
     socket.emit('playAgain');
   });
-
   els.submitGuessBtn.addEventListener('click', () => {
     ensureAudio();
     const guess = els.guessInput.value.trim();
@@ -494,18 +467,15 @@ function bindEvents() {
     socket.emit('submitImposterGuess', { guess });
     els.guessInput.value = '';
   });
-
   els.guessInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       els.submitGuessBtn.click();
     }
   });
-
   const params = new URLSearchParams(window.location.search);
   const roomFromUrl = sanitizeCode(params.get('room') || '');
   if (roomFromUrl.length === 4) els.roomInput.value = roomFromUrl;
-
   attachCanvasInput();
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
