@@ -10,12 +10,31 @@
         theme: {
           extend: {
             fontFamily: {
-              inter: ['Inter', 'sans-serif']
+              display: ['Space Grotesk', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace']
+            },
+            colors: {
+              cyber: {
+                bg: '#070a13',
+                surface: '#0d1220',
+                border: '#1a2332',
+                cyan: '#22d3ee',
+                magenta: '#f43f5e',
+                lime: '#84cc16',
+                amber: '#fbbf24'
+              }
             },
             boxShadow: {
               neonCyan: '0 0 0 1px rgba(34,211,238,.35), 0 0 18px rgba(34,211,238,.25)',
               neonRose: '0 0 0 1px rgba(244,63,94,.35), 0 0 18px rgba(244,63,94,.25)',
-              neonEmerald: '0 0 0 1px rgba(16,185,129,.35), 0 0 18px rgba(16,185,129,.25)'
+              neonEmerald: '0 0 0 1px rgba(16,185,129,.35), 0 0 18px rgba(16,185,129,.25)',
+              neonAmber: '0 0 0 1px rgba(251,191,36,.35), 0 0 18px rgba(251,191,36,.25)',
+              glowCyan: '0 0 30px rgba(34,211,238,.15)'
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.4s ease-out',
+              'slide-up': 'slideUp 0.4s ease-out',
+              'glow-pulse': 'glowPulse 2s ease-in-out infinite'
             }
           }
         }
@@ -24,7 +43,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
     <style>
@@ -32,24 +51,48 @@
         color-scheme: dark;
       }
 
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+
       body {
-        background: radial-gradient(circle at 20% 20%, #11182a 0%, #0b0f19 38%, #090c14 100%);
+        background:
+          radial-gradient(ellipse at 15% 10%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+          radial-gradient(ellipse at 85% 90%, rgba(244, 63, 94, 0.06) 0%, transparent 50%),
+          linear-gradient(180deg, #070a13 0%, #0b0f1a 100%);
+        background-attachment: fixed;
+        min-height: 100vh;
       }
 
       .glass {
-        background: rgba(15, 23, 42, 0.8);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(30, 41, 59, 0.8);
+        background: rgba(13, 18, 32, 0.75);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(26, 35, 50, 0.8);
         border-radius: 1rem;
+      }
+
+      .glass-hover:hover {
+        border-color: rgba(34, 211, 238, 0.4);
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.1);
+      }
+
+      .neon-text {
+        text-shadow: 0 0 20px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.1);
+      }
+
+      .neon-text-rose {
+        text-shadow: 0 0 20px rgba(244, 63, 94, 0.3), 0 0 40px rgba(244, 63, 94, 0.1);
       }
 
       #gameCanvas {
         touch-action: none;
-        background: linear-gradient(160deg, #0f172a 0%, #111827 100%);
+        background: linear-gradient(160deg, #0a0e1a 0%, #0d1220 100%);
+        cursor: crosshair;
       }
 
       .timer-fill {
-        background: linear-gradient(90deg, #10b981 0%, #facc15 50%, #ef4444 100%);
+        background: linear-gradient(90deg, #22d3ee 0%, #fbbf24 50%, #f43f5e 100%);
       }
 
       .pulse {
@@ -57,107 +100,304 @@
       }
 
       @keyframes pulseScale {
-        0%,
-        100% {
-          transform: scale(1);
-        }
-        50% {
-          transform: scale(1.04);
-        }
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.04); }
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes glowPulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.1); }
+        50% { box-shadow: 0 0 40px rgba(34, 211, 238, 0.25); }
+      }
+
+      .hint-card {
+        animation: slideUp 0.4s ease-out;
+      }
+
+      .grid-bg {
+        background-image:
+          linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+        background-size: 40px 40px;
+      }
+
+      .scan-line::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.5), transparent);
+        animation: scan 3s linear infinite;
+      }
+
+      @keyframes scan {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(540px); }
+      }
+
+      input:focus {
+        box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.3), 0 0 12px rgba(34, 211, 238, 0.1);
+      }
+
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(34, 211, 238, 0.2);
+        border-radius: 3px;
       }
     </style>
   </head>
-  <body class="font-inter text-slate-100 min-h-screen">
-    <main class="max-w-7xl mx-auto px-4 py-6 md:py-8">
-      <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-2xl md:text-3xl font-extrabold tracking-wide">SABOTAGE CANVAS</h1>
-          <p class="text-slate-400 text-sm md:text-base">Zeichne schnell. Täusche besser. Entlarve den Imposter.</p>
-        </div>
-        <div id="connectionDot" class="px-3 py-1 rounded-full bg-slate-900/90 border border-slate-700 text-xs uppercase tracking-wider">
-          Verbinde...
-        </div>
-      </header>
+  <body class="font-display text-slate-100 min-h-screen">
+    <!-- Background grid overlay -->
+    <div class="fixed inset-0 grid-bg pointer-events-none opacity-50"></div>
 
-      <section id="lobbyPanel" class="glass p-5 md:p-6 mb-5">
-        <div class="grid md:grid-cols-2 gap-4">
-          <div>
-            <label for="nicknameInput" class="text-sm text-slate-300">Nickname</label>
-            <input id="nicknameInput" maxlength="20" class="mt-1 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-4 py-2.5 outline-none focus:border-cyan-400" placeholder="z. B. NeonNinja" />
+    <!-- Connection indicator -->
+    <div class="fixed top-4 right-4 z-50">
+      <div id="connectionDot" class="px-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-700 text-xs uppercase tracking-wider font-mono">
+        Verbinde...
+      </div>
+    </div>
+
+    <main class="relative max-w-7xl mx-auto px-4 py-6 md:py-10">
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- VIEW 1: LANDING PAGE                                     -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <section id="landingView" class="animate-fade-in">
+        <div class="flex flex-col items-center justify-center min-h-[80vh] text-center">
+          <div class="mb-2 px-4 py-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/5 text-xs font-mono uppercase tracking-[0.25em] text-cyan-300">
+            Multiplayer · Echtzeit · Drawing
           </div>
-          <div>
-            <label for="roomInput" class="text-sm text-slate-300">4-stelliger Raumcode</label>
-            <input id="roomInput" inputmode="numeric" maxlength="4" class="mt-1 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-4 py-2.5 outline-none focus:border-cyan-400" placeholder="1234" />
+          <h1 class="text-5xl md:text-7xl font-bold tracking-tight neon-text mb-4">
+            <span class="text-cyan-300">SABOTAGE</span>
+            <span class="text-rose-400 neon-text-rose">CANVAS</span>
+          </h1>
+          <p class="text-slate-400 text-lg md:text-xl max-w-2xl mb-10">
+            Zeichne schnell. Täusche besser. Entlarve den Imposter.<br />
+            <span class="text-sm text-slate-500">Ein Echtzeit-Partyspiel für 3–8 Spieler.</span>
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-5 w-full max-w-3xl">
+            <!-- Create Room Card -->
+            <div class="glass glass-hover p-6 md:p-8 text-left transition-all duration-300 hover:scale-[1.02]">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                </div>
+                <h2 class="text-xl font-semibold text-cyan-200">Raum erstellen</h2>
+              </div>
+              <p class="text-slate-400 text-sm mb-4">Erstelle einen neuen Raum und lade deine Freunde mit dem Code ein.</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="text-xs uppercase tracking-wider text-slate-500 font-mono">Dein Nickname</label>
+                  <input id="createNicknameInput" maxlength="20" class="mt-1 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-4 py-3 outline-none focus:border-cyan-400 transition-all text-slate-100 placeholder-slate-600" placeholder="z. B. NeonNinja" />
+                </div>
+                <button id="createRoomBtn" class="w-full rounded-xl px-4 py-3 bg-cyan-500/15 border border-cyan-400/50 text-cyan-200 font-semibold hover:bg-cyan-500/25 hover:border-cyan-400 transition-all duration-200">
+                  Raum erstellen →
+                </button>
+              </div>
+              <p id="createError" class="mt-3 min-h-5 text-rose-300 text-sm"></p>
+            </div>
+
+            <!-- Join Room Card -->
+            <div class="glass glass-hover p-6 md:p-8 text-left transition-all duration-300 hover:scale-[1.02]">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
+                </div>
+                <h2 class="text-xl font-semibold text-emerald-200">Raum beitreten</h2>
+              </div>
+              <p class="text-slate-400 text-sm mb-4">Gib einen 4-stelligen Code ein, um einem laufenden Raum beizutreten.</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="text-xs uppercase tracking-wider text-slate-500 font-mono">Dein Nickname</label>
+                  <input id="joinNicknameInput" maxlength="20" class="mt-1 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-400 transition-all text-slate-100 placeholder-slate-600" placeholder="z. B. PixelPirate" />
+                </div>
+                <div>
+                  <label class="text-xs uppercase tracking-wider text-slate-500 font-mono">4-stelliger Raumcode</label>
+                  <input id="joinRoomInput" inputmode="numeric" maxlength="4" class="mt-1 w-full rounded-xl bg-slate-950/70 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-400 transition-all text-slate-100 placeholder-slate-600 font-mono text-center text-2xl tracking-[0.5em]" placeholder="----" />
+                </div>
+                <button id="joinRoomBtn" class="w-full rounded-xl px-4 py-3 bg-emerald-500/15 border border-emerald-400/50 text-emerald-200 font-semibold hover:bg-emerald-500/25 hover:border-emerald-400 transition-all duration-200">
+                  Raum beitreten →
+                </button>
+              </div>
+              <p id="joinError" class="mt-3 min-h-5 text-rose-300 text-sm"></p>
+            </div>
+          </div>
+
+          <!-- Feature badges -->
+          <div class="mt-10 flex flex-wrap justify-center gap-3">
+            <span class="px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-700 text-xs text-slate-400 font-mono">120+ Wörter</span>
+            <span class="px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-700 text-xs text-slate-400 font-mono">8 Kategorien</span>
+            <span class="px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-700 text-xs text-slate-400 font-mono">Progressive Hints</span>
+            <span class="px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-700 text-xs text-slate-400 font-mono">Echtzeit-Sync</span>
           </div>
         </div>
-        <div class="mt-4 flex flex-wrap gap-3">
-          <button id="createRoomBtn" class="rounded-xl px-4 py-2.5 bg-cyan-500/20 border border-cyan-400/60 text-cyan-200 font-semibold hover:bg-cyan-500/30">Raum erstellen</button>
-          <button id="joinRoomBtn" class="rounded-xl px-4 py-2.5 bg-emerald-500/20 border border-emerald-400/60 text-emerald-200 font-semibold hover:bg-emerald-500/30">Raum beitreten</button>
-        </div>
-        <p id="lobbyError" class="mt-3 min-h-5 text-rose-300 text-sm"></p>
       </section>
 
-      <section id="gamePanel" class="hidden">
-        <div class="grid lg:grid-cols-[1fr_320px] gap-5">
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- VIEW 2: LOBBY                                            -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <section id="lobbyView" class="hidden animate-fade-in">
+        <div class="flex flex-col items-center min-h-[80vh] justify-center">
+          <div class="glass p-6 md:p-10 w-full max-w-2xl text-center">
+            <div class="text-xs uppercase tracking-[0.25em] text-slate-500 font-mono mb-2">Raum erstellt</div>
+            <div class="mb-6">
+              <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Dein Raumcode</div>
+              <div id="lobbyRoomCode" class="text-6xl md:text-7xl font-bold font-mono tracking-[0.3em] text-cyan-300 neon-text">----</div>
+            </div>
+
+            <button id="lobbyInviteBtn" class="mb-6 rounded-xl px-5 py-2.5 bg-slate-800 border border-slate-700 hover:border-cyan-400 hover:bg-cyan-500/10 transition-all duration-200 text-sm">
+              Invite Link kopieren
+            </button>
+
+            <div class="border-t border-slate-700/50 pt-6">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-left">Spieler in der Lobby</h2>
+                <div id="lobbyPlayerCount" class="text-sm text-slate-400 font-mono">0/8</div>
+              </div>
+              <div id="lobbyPlayersList" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left"></div>
+            </div>
+
+            <div class="mt-6 pt-6 border-t border-slate-700/50">
+              <div id="lobbyStartWrap">
+                <button id="lobbyStartBtn" class="rounded-xl px-6 py-3 bg-cyan-500/15 border border-cyan-400/50 text-cyan-200 font-semibold hover:bg-cyan-500/25 hover:border-cyan-400 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
+                  Spiel starten
+                </button>
+                <p id="lobbyStartHint" class="mt-2 text-sm text-slate-500">Mindestens 3 Spieler benötigt</p>
+              </div>
+              <button id="lobbyLeaveBtn" class="mt-3 rounded-xl px-4 py-2 bg-slate-800 border border-slate-700 hover:border-rose-400/50 hover:text-rose-300 transition-all duration-200 text-sm text-slate-400">
+                Lobby verlassen
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <!-- VIEW 3: GAME ARENA                                       -->
+      <!-- ═══════════════════════════════════════════════════════ -->
+      <section id="gameView" class="hidden animate-fade-in">
+        <div class="grid lg:grid-cols-[1fr_340px] gap-5">
+          <!-- Main game area -->
           <div class="space-y-4">
+            <!-- Top bar: room code + controls -->
             <div class="glass p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div class="text-xs uppercase tracking-[0.18em] text-slate-400">Raum</div>
-                  <div class="text-lg font-bold" id="roomCodeDisplay">----</div>
+                <div class="flex items-center gap-3">
+                  <div>
+                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-mono">Raum</div>
+                    <div class="text-lg font-bold font-mono text-cyan-300" id="roomCodeDisplay">----</div>
+                  </div>
+                  <div class="hidden md:block w-px h-8 bg-slate-700"></div>
+                  <div class="hidden md:block">
+                    <div class="text-xs uppercase tracking-[0.18em] text-slate-500 font-mono">Runde</div>
+                    <div class="text-lg font-bold" id="roundDisplay">1</div>
+                  </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <button id="inviteBtn" class="rounded-xl px-3 py-2 bg-slate-800 border border-slate-700 hover:border-cyan-400">Invite Link kopieren</button>
-                  <button id="startBtn" class="rounded-xl px-3 py-2 bg-cyan-500/20 border border-cyan-400/60 text-cyan-200 font-semibold">Spiel starten</button>
-                  <button id="playAgainBtn" class="hidden rounded-xl px-3 py-2 bg-emerald-500/20 border border-emerald-400/60 text-emerald-200 font-semibold">Play Again</button>
+                  <button id="inviteBtn" class="rounded-xl px-3 py-2 bg-slate-800 border border-slate-700 hover:border-cyan-400 transition-all text-sm">Link kopieren</button>
+                  <button id="startBtn" class="hidden rounded-xl px-4 py-2 bg-cyan-500/15 border border-cyan-400/50 text-cyan-200 font-semibold hover:bg-cyan-500/25 transition-all text-sm">Spiel starten</button>
+                  <button id="playAgainBtn" class="hidden rounded-xl px-4 py-2 bg-emerald-500/15 border border-emerald-400/50 text-emerald-200 font-semibold hover:bg-emerald-500/25 transition-all text-sm">Nochmal</button>
+                  <button id="leaveGameBtn" class="rounded-xl px-3 py-2 bg-slate-800 border border-slate-700 hover:border-rose-400/50 hover:text-rose-300 transition-all text-sm text-slate-400">Verlassen</button>
                 </div>
               </div>
             </div>
 
+            <!-- Timer + Canvas -->
             <div class="glass p-4 md:p-5">
               <div class="mb-3">
                 <div class="flex items-center justify-between text-sm mb-2">
-                  <span id="timerLabel" class="text-slate-300">Turn-Timer</span>
-                  <span id="timerValue" class="font-semibold text-slate-200">--.-s</span>
+                  <span id="timerLabel" class="text-slate-300 font-mono text-xs uppercase tracking-wider">Turn-Timer</span>
+                  <span id="timerValue" class="font-mono font-semibold text-slate-200">--.-s</span>
                 </div>
                 <div class="h-3 w-full rounded-full bg-slate-800 overflow-hidden border border-slate-700">
-                  <div id="timerBar" class="timer-fill h-full w-0 transition-[width] duration-75"></div>
+                  <div id="timerBar" class="timer-fill h-full w-0 transition-[width] duration-75 rounded-full"></div>
                 </div>
               </div>
-              <div class="rounded-2xl border border-slate-700/70 overflow-hidden shadow-[inset_0_0_0_1px_rgba(15,23,42,0.7)]">
+              <div class="relative rounded-2xl border border-slate-700/70 overflow-hidden shadow-[inset_0_0_0_1px_rgba(15,23,42,0.7)] scan-line">
                 <canvas id="gameCanvas" class="w-full h-[420px] md:h-[540px] block"></canvas>
+                <!-- Waiting overlay -->
+                <div id="canvasOverlay" class="absolute inset-0 flex items-center justify-center bg-slate-950/40 pointer-events-none">
+                  <p id="canvasOverlayText" class="text-slate-400 text-sm font-mono uppercase tracking-wider"></p>
+                </div>
               </div>
               <p id="statusLine" class="mt-3 text-sm md:text-base text-slate-200">Warte auf Spieler...</p>
               <div id="legend" class="mt-3 flex flex-wrap gap-2"></div>
             </div>
           </div>
 
+          <!-- Sidebar -->
           <aside class="space-y-4">
+            <!-- Role / Hint panel -->
             <div class="glass p-4">
-              <h2 class="font-semibold mb-3">Deine Rolle</h2>
+              <h2 class="font-semibold mb-3 flex items-center gap-2">
+                <span class="w-1 h-4 rounded-full bg-cyan-400"></span>
+                Deine Rolle
+              </h2>
               <div class="space-y-2 text-sm">
-                <p class="text-slate-300">Kategorie: <span id="categoryText" class="text-cyan-300 font-semibold">-</span></p>
-                <p class="text-slate-300">Wort: <span id="wordText" class="text-emerald-300 font-semibold">-</span></p>
-                <p id="imposterBadge" class="hidden text-xs font-bold px-3 py-2 rounded-xl bg-rose-500/20 border border-rose-500/60 text-rose-200 shadow-neonRose">DU BIST DER IMPOSTER!</p>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Kategorie</span>
+                  <span id="categoryText" class="text-cyan-300 font-semibold font-mono">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Wort</span>
+                  <span id="wordText" class="text-emerald-300 font-semibold font-mono">-</span>
+                </div>
+                <div id="imposterBadge" class="hidden text-xs font-bold px-3 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/50 text-rose-200 shadow-neonRose text-center mt-2">
+                  DU BIST DER IMPOSTER!
+                </div>
+              </div>
+
+              <!-- Progressive hints for Imposter -->
+              <div id="imposterHintsPanel" class="hidden mt-4 pt-4 border-t border-slate-700/50">
+                <div class="text-xs uppercase tracking-wider text-slate-500 font-mono mb-2">Hinweise</div>
+                <div id="imposterHintsList" class="space-y-2"></div>
               </div>
             </div>
 
+            <!-- Players list -->
             <div class="glass p-4">
-              <h2 class="font-semibold mb-3">Spieler</h2>
+              <h2 class="font-semibold mb-3 flex items-center gap-2">
+                <span class="w-1 h-4 rounded-full bg-emerald-400"></span>
+                Spieler
+              </h2>
               <div id="playersList" class="space-y-2"></div>
             </div>
 
+            <!-- Voting panel -->
             <div id="votePanel" class="glass p-4 hidden">
-              <h2 class="font-semibold mb-3">Voting (30s)</h2>
+              <h2 class="font-semibold mb-3 flex items-center gap-2">
+                <span class="w-1 h-4 rounded-full bg-rose-400"></span>
+                Voting <span class="text-xs text-slate-500 font-mono ml-1">(30s)</span>
+              </h2>
               <div id="voteCards" class="grid gap-2"></div>
             </div>
 
+            <!-- Showdown panel -->
             <div id="showdownPanel" class="glass p-4 hidden">
-              <h2 class="font-semibold mb-2">Showdown</h2>
+              <h2 class="font-semibold mb-2 flex items-center gap-2">
+                <span class="w-1 h-4 rounded-full bg-amber-400"></span>
+                Showdown
+              </h2>
               <p id="showdownText" class="text-sm text-slate-300 mb-3"></p>
               <div id="guessWrap" class="hidden space-y-2">
-                <input id="guessInput" class="w-full rounded-xl bg-slate-950/70 border border-slate-700 px-3 py-2.5 outline-none focus:border-rose-400" placeholder="Geheimes Wort eingeben" />
-                <button id="submitGuessBtn" class="w-full rounded-xl px-3 py-2 bg-rose-500/20 border border-rose-400/60 text-rose-200 font-semibold">Wort bestätigen</button>
+                <input id="guessInput" class="w-full rounded-xl bg-slate-950/70 border border-slate-700 px-3 py-2.5 outline-none focus:border-rose-400 transition-all text-slate-100" placeholder="Geheimes Wort eingeben" />
+                <button id="submitGuessBtn" class="w-full rounded-xl px-3 py-2.5 bg-rose-500/15 border border-rose-400/50 text-rose-200 font-semibold hover:bg-rose-500/25 transition-all">Wort bestätigen</button>
               </div>
             </div>
           </aside>

@@ -2,47 +2,16 @@ const path = require('path');
 const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
+const WORD_BANK = require('./words');
 
 const PORT = process.env.PORT || 3000;
 const MIN_PLAYERS = 3;
+const MAX_PLAYERS = 8;
 const DRAW_TURN_MS = 3000;
 const VOTING_MS = 30000;
 const SHOWDOWN_MS = 15000;
 
 const COLORS = ['#06b6d4', '#f43f5e', '#10b981', '#f59e0b', '#a855f7', '#22d3ee', '#fb7185', '#34d399'];
-
-const WORD_BANK = [
-  { category: 'Tiere', word: 'Giraffe' },
-  { category: 'Tiere', word: 'Pinguin' },
-  { category: 'Tiere', word: 'Delfin' },
-  { category: 'Tiere', word: 'Fuchs' },
-  { category: 'Tiere', word: 'Chameleon' },
-  { category: 'Fahrzeuge', word: 'Bagger' },
-  { category: 'Fahrzeuge', word: 'Heißluftballon' },
-  { category: 'Fahrzeuge', word: 'U-Boot' },
-  { category: 'Fahrzeuge', word: 'Motorrad' },
-  { category: 'Fahrzeuge', word: 'Traktor' },
-  { category: 'Essen', word: 'Sushi' },
-  { category: 'Essen', word: 'Brezel' },
-  { category: 'Essen', word: 'Croissant' },
-  { category: 'Essen', word: 'Wassermelone' },
-  { category: 'Essen', word: 'Taco' },
-  { category: 'Berufe', word: 'Astronaut' },
-  { category: 'Berufe', word: 'Zauberer' },
-  { category: 'Berufe', word: 'Feuerwehrmann' },
-  { category: 'Berufe', word: 'Detektiv' },
-  { category: 'Berufe', word: 'Koch' },
-  { category: 'Orte', word: 'Leuchtturm' },
-  { category: 'Orte', word: 'Vulkan' },
-  { category: 'Orte', word: 'Burg' },
-  { category: 'Orte', word: 'Aquarium' },
-  { category: 'Orte', word: 'Wüste' },
-  { category: 'Objekte', word: 'Regenschirm' },
-  { category: 'Objekte', word: 'Kompass' },
-  { category: 'Objekte', word: 'Schneekugel' },
-  { category: 'Objekte', word: 'Stethoskop' },
-  { category: 'Objekte', word: 'Fernrohr' }
-];
 
 const app = express();
 const server = http.createServer(app);
@@ -87,11 +56,56 @@ function clearTimers(room) {
   room.showdownTimer = null;
 }
 
+function pickWord(room) {
+  const available = WORD_BANK.filter((w) => !room.usedWords.has(w.word));
+  if (available.length === 0) {
+    room.usedWords.clear();
+    return WORD_BANK[randomInt(WORD_BANK.length)];
+  }
+  return available[randomInt(available.length)];
+}
+
+function assignRoundSecrets(room) {
+  const chosen = pickWord(room);
+  room.category = chosen.category;
+  room.word = chosen.word;
+  room.hints = chosen.hints || [];
+  room.usedWords.add(chosen.word);
+  const imposter = room.players[randomInt(room.players.length)];
+  room.imposterId = imposter.id;
+}
+
+function computeImposterHints(room) {
+  const hintsRevealed = [];
+  if (room.category) hintsRevealed.push(room.category);
+  if (room.phase === 'drawing' && room.hints) {
+    const turnsElapsed = room.turnNumber || 0;
+    const totalTurns = room.totalTurns || 1;
+    const hintThresholds = [
+      Math.floor(totalTurns * 0.33),
+      Math.floor(totalTurns * 0.66)
+    ];
+    if (turnsElapsed >= hintThresholds[0] && room.hints[0]) hintsRevealed.push(room.hints[0]);
+    if (turnsElapsed >= hintThresholds[1] && room.hints[1]) hintsRevealed.push(room.hints[1]);
+  }
+  if (room.phase === 'voting' && room.hints) {
+    if (room.hints[0]) hintsRevealed.push(room.hints[0]);
+    if (room.hints[1]) hintsRevealed.push(room.hints[1]);
+  }
+  if ((room.phase === 'showdown' || room.phase === 'ended') && room.hints) {
+    if (room.hints[0]) hintsRevealed.push(room.hints[0]);
+    if (room.hints[1]) hintsRevealed.push(room.hints[1]);
+    if (room.hints[2]) hintsRevealed.push(room.hints[2]);
+  }
+  return [...new Set(hintsRevealed)];
+}
+
 function baseRoomState(room) {
   return {
     roomCode: room.code,
     phase: room.phase,
     minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
     hostId: room.hostId,
     roundNumber: room.roundNumber,
     activePlayerId: room.activePlayerId,
@@ -99,6 +113,8 @@ function baseRoomState(room) {
     turnStartedAt: room.turnStartedAt,
     voteEndsAt: room.voteEndsAt,
     showdownEndsAt: room.showdownEndsAt,
+    turnNumber: room.turnNumber,
+    totalTurns: room.totalTurns,
     players: room.players.map((p) => ({
       id: p.id,
       nickname: p.nickname,
@@ -122,12 +138,14 @@ function emitRoleInfo(room) {
   for (const player of room.players) {
     const socket = io.sockets.sockets.get(player.id);
     if (!socket) continue;
+    const isImposter = player.id === room.imposterId;
     const payload = {
       phase: room.phase,
       category: room.category || null,
-      isImposter: player.id === room.imposterId,
-      word: player.id === room.imposterId ? null : room.word || null,
-      warning: player.id === room.imposterId && room.phase !== 'lobby' ? 'DU BIST DER IMPOSTER!' : null
+      isImposter,
+      word: isImposter ? null : room.word || null,
+      imposterHints: isImposter ? computeImposterHints(room) : [],
+      warning: isImposter && room.phase !== 'lobby' ? 'DU BIST DER IMPOSTER!' : null
     };
     socket.emit('roleInfo', payload);
   }
@@ -150,14 +168,6 @@ function recalcVoteCounts(room) {
     counts[targetId] = (counts[targetId] || 0) + 1;
   }
   room.voteCounts = counts;
-}
-
-function assignRoundSecrets(room) {
-  const chosen = WORD_BANK[randomInt(WORD_BANK.length)];
-  room.category = chosen.category;
-  room.word = chosen.word;
-  const imposter = room.players[randomInt(room.players.length)];
-  room.imposterId = imposter.id;
 }
 
 function beginVoting(room) {
@@ -292,6 +302,7 @@ function resetForLobby(room, reason) {
   room.result = null;
   room.category = null;
   room.word = null;
+  room.hints = [];
   room.imposterId = null;
   room.votedOutId = null;
   room.strokes = [];
@@ -408,8 +419,10 @@ io.on('connection', (socket) => {
       strokes: [],
       category: null,
       word: null,
+      hints: [],
       imposterId: null,
-      votedOutId: null
+      votedOutId: null,
+      usedWords: new Set()
     };
     rooms.set(code, room);
     playerRoom.set(socket.id, code);
@@ -434,6 +447,10 @@ io.on('connection', (socket) => {
       socket.emit('errorMessage', 'Das Spiel läuft bereits. Bitte warte auf die nächste Runde.');
       return;
     }
+    if (room.players.length >= MAX_PLAYERS) {
+      socket.emit('errorMessage', 'Der Raum ist voll (maximal 8 Spieler).');
+      return;
+    }
     if (room.players.some((p) => p.nickname.toLowerCase() === cleanName.toLowerCase())) {
       socket.emit('errorMessage', 'Dieser Nickname ist in diesem Raum bereits vergeben.');
       return;
@@ -444,6 +461,15 @@ io.on('connection', (socket) => {
     socket.join(code);
     socket.emit('joinedRoom', { roomCode: code, playerId: socket.id });
     emitRoomState(room);
+  });
+
+  socket.on('leaveRoom', () => {
+    const room = findRoomBySocketId(socket.id);
+    if (!room) return;
+    socket.leave(room.code);
+    playerRoom.delete(socket.id);
+    removePlayer(room, socket.id);
+    socket.emit('leftRoom');
   });
 
   socket.on('startGame', () => {
