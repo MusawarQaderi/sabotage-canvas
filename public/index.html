@@ -9,172 +9,74 @@
       tailwind.config = {
         theme: {
           extend: {
-            fontFamily: {
-              display: ['Space Grotesk', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace']
-            },
-            colors: {
-              brand: '#6366f1', // Indigo-500 als Hauptfarbe
-              brandHover: '#4f46e5',
-            },
-            boxShadow: {
-              /* Wir fangen die JS-Klassen ab und wandeln "Neon" in moderne, flache Ringe um */
-              neonCyan: '0 0 0 2px #38bdf8', 
-              neonRose: '0 0 0 2px #fb7185',
-              soft: '0 8px 30px rgba(0,0,0,0.4)',
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.3s ease-out',
-            }
+            fontFamily: { display: ['Space Grotesk', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+            colors: { brand: '#6366f1', brandHover: '#4f46e5' },
+            boxShadow: { soft: '0 8px 30px rgba(0,0,0,0.4)' },
+            animation: { 'fade-in': 'fadeIn 0.3s ease-out', 'shake': 'shake 0.4s ease-in-out' }
           }
         }
       };
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
     <style>
       :root { color-scheme: dark; }
-      * { -webkit-tap-highlight-color: transparent; }
+      body { background-color: #09090b; color: #f4f4f5; min-height: 100vh; touch-action: manipulation; }
+      .panel { background-color: #18181b; border: 1px solid #27272a; border-radius: 1.5rem; }
+      #gameCanvas { touch-action: none; background-color: #18181b; cursor: crosshair; transition: filter 0.3s ease; }
       
-      body {
-        background-color: #09090b; /* Extrem tiefes Zinc-Schwarz */
-        color: #f4f4f5;
-        min-height: 100vh;
-      }
-
-      /* Cleane Panel-Optik */
-      .panel {
-        background-color: #18181b;
-        border: 1px solid #27272a;
-        border-radius: 1.5rem;
-      }
-
-      #gameCanvas {
-        touch-action: none;
-        background-color: #18181b;
-        cursor: crosshair;
-      }
-
-      /* Simpler, schicker Timer */
-      .timer-fill {
-        background-color: #f4f4f5;
-      }
-
-      /* Pulsieren aus dem JS dezenter machen */
-      .pulse {
-        animation: subtlePulse 1.5s ease-in-out infinite;
-      }
-
-      @keyframes subtlePulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.02); }
-      }
-
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-
-      /* Eingabefelder extrem clean */
-      input {
-        background-color: #09090b !important;
-        border: 2px solid #27272a !important;
-        transition: all 0.2s;
-      }
-      input:focus {
-        border-color: #6366f1 !important;
-        outline: none;
-      }
-
-      /* Minimalistische Scrollbar */
+      /* Der Tinten-Sabotage Effekt */
+      .sabotage-active { filter: blur(8px) contrast(1.5) grayscale(0.5); pointer-events: none; }
+      
+      .timer-fill { background-color: #f4f4f5; }
+      input { background-color: #09090b !important; border: 2px solid #27272a !important; transition: all 0.2s; }
+      input:focus { border-color: #6366f1 !important; outline: none; }
       ::-webkit-scrollbar { width: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
     </style>
   </head>
   <body class="font-display antialiased selection:bg-brand selection:text-white">
     
-    <!-- Connection indicator -->
     <div class="fixed top-6 right-6 z-50">
-      <div id="connectionDot" class="px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-bold uppercase tracking-wider font-mono">
-        ...
-      </div>
+      <div id="connectionDot" class="px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-bold uppercase tracking-wider font-mono">...</div>
     </div>
 
     <main class="relative max-w-[1400px] mx-auto px-4 py-8 md:py-12">
-      
-      <!-- ========================================== -->
-      <!-- VIEW 1: LANDING PAGE                       -->
-      <!-- ========================================== -->
+      <!-- LANDING -->
       <section id="landingView" class="animate-fade-in">
         <div class="flex flex-col items-center justify-center min-h-[75vh] text-center">
-          
-          <h1 class="text-6xl md:text-8xl font-extrabold tracking-tighter mb-6">
-            SABOTAGE<br/><span class="text-brand">CANVAS</span>
-          </h1>
-          <p class="text-zinc-400 text-lg md:text-xl max-w-xl mb-12 font-medium">
-            Zeichne schnell. Täusche besser. Entlarve den Imposter. <br/>Ein Echtzeit-Spiel für 3 bis 8 Spieler.
-          </p>
-
+          <h1 class="text-6xl md:text-8xl font-extrabold tracking-tighter mb-6">SABOTAGE<br/><span class="text-brand">CANVAS</span></h1>
+          <p class="text-zinc-400 text-lg md:text-xl max-w-xl mb-12 font-medium">Zeichne kryptisch. Täusche besser. Nutze Sabotage.<br/>Ein asymmetrisches Zeichenspiel für 3 bis 8 Spieler.</p>
           <div class="grid md:grid-cols-2 gap-6 w-full max-w-4xl">
-            
-            <!-- Create Room Card -->
             <div class="panel p-8 text-left hover:border-zinc-700 transition-colors">
               <h2 class="text-2xl font-bold text-white mb-2">Raum erstellen</h2>
-              <p class="text-zinc-400 text-sm mb-6">Neues Spiel starten und Freunde einladen.</p>
-              
-              <div class="space-y-4">
-                <div>
-                  <label class="text-xs font-bold uppercase tracking-wider text-zinc-500">Dein Nickname</label>
-                  <input id="createNicknameInput" maxlength="20" class="w-full rounded-xl px-4 py-3.5 text-white placeholder-zinc-600 mt-1" placeholder="z. B. NeonNinja" />
-                </div>
-                <button id="createRoomBtn" class="w-full rounded-xl px-4 py-3.5 bg-white text-black font-bold text-lg hover:bg-zinc-200 transition-colors">
-                  Raum erstellen
-                </button>
+              <div class="space-y-4 mt-6">
+                <input id="createNicknameInput" maxlength="20" class="w-full rounded-xl px-4 py-3.5 text-white placeholder-zinc-600" placeholder="Dein Nickname" />
+                <button id="createRoomBtn" class="w-full rounded-xl px-4 py-3.5 bg-white text-black font-bold text-lg hover:bg-zinc-200">Erstellen</button>
               </div>
-              <p id="createError" class="mt-3 min-h-5 text-rose-400 text-sm font-medium"></p>
+              <p id="createError" class="mt-3 text-rose-400 text-sm font-medium h-5"></p>
             </div>
-
-            <!-- Join Room Card -->
             <div class="panel p-8 text-left hover:border-zinc-700 transition-colors">
               <h2 class="text-2xl font-bold text-white mb-2">Beitreten</h2>
-              <p class="text-zinc-400 text-sm mb-6">Mit Raumcode in eine laufende Lobby einsteigen.</p>
-              
-              <div class="space-y-4">
-                <div>
-                  <label class="text-xs font-bold uppercase tracking-wider text-zinc-500">Dein Nickname</label>
-                  <input id="joinNicknameInput" maxlength="20" class="w-full rounded-xl px-4 py-3.5 text-white placeholder-zinc-600 mt-1" placeholder="z. B. PixelPirate" />
-                </div>
-                <div>
-                  <label class="text-xs font-bold uppercase tracking-wider text-zinc-500">Raumcode</label>
-                  <input id="joinRoomInput" inputmode="numeric" maxlength="4" class="w-full rounded-xl px-4 py-3.5 text-white placeholder-zinc-600 font-mono text-center text-3xl tracking-[0.3em] mt-1" placeholder="----" />
-                </div>
-                <button id="joinRoomBtn" class="w-full rounded-xl px-4 py-3.5 bg-zinc-800 text-white font-bold text-lg hover:bg-zinc-700 transition-colors">
-                  Beitreten
-                </button>
+              <div class="space-y-4 mt-6">
+                <input id="joinNicknameInput" maxlength="20" class="w-full rounded-xl px-4 py-3.5 text-white placeholder-zinc-600" placeholder="Dein Nickname" />
+                <input id="joinRoomInput" inputmode="numeric" maxlength="4" class="w-full rounded-xl px-4 py-3.5 text-white placeholder-zinc-600 font-mono text-center text-3xl tracking-[0.3em]" placeholder="----" />
+                <button id="joinRoomBtn" class="w-full rounded-xl px-4 py-3.5 bg-zinc-800 text-white font-bold text-lg hover:bg-zinc-700">Beitreten</button>
               </div>
-              <p id="joinError" class="mt-3 min-h-5 text-rose-400 text-sm font-medium"></p>
+              <p id="joinError" class="mt-3 text-rose-400 text-sm font-medium h-5"></p>
             </div>
-
           </div>
         </div>
       </section>
 
-      <!-- ========================================== -->
-      <!-- VIEW 2: LOBBY                              -->
-      <!-- ========================================== -->
+      <!-- LOBBY -->
       <section id="lobbyView" class="hidden animate-fade-in">
         <div class="flex flex-col items-center min-h-[75vh] justify-center">
           <div class="panel p-8 md:p-12 w-full max-w-3xl text-center shadow-soft">
-            
             <div class="text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 mb-4">Raumcode</div>
             <div id="lobbyRoomCode" class="text-7xl md:text-9xl font-black font-mono text-white mb-8">----</div>
-            
-            <button id="lobbyInviteBtn" class="mb-10 rounded-xl px-6 py-3 bg-zinc-800 text-white font-semibold hover:bg-zinc-700 transition-colors">
-              Link kopieren
-            </button>
-
+            <button id="lobbyInviteBtn" class="mb-10 rounded-xl px-6 py-3 bg-zinc-800 text-white font-semibold hover:bg-zinc-700">Link kopieren</button>
             <div class="text-left bg-zinc-950/50 rounded-2xl p-6 border border-zinc-800">
               <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-bold">Spieler</h2>
@@ -182,53 +84,34 @@
               </div>
               <div id="lobbyPlayersList" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-lg font-medium"></div>
             </div>
-
             <div class="mt-8 pt-8 border-t border-zinc-800 flex flex-col items-center">
-              <div id="lobbyStartWrap" class="w-full max-w-sm">
-                <button id="lobbyStartBtn" class="w-full rounded-xl px-6 py-4 bg-brand text-white font-bold text-xl hover:bg-brandHover transition-colors disabled:opacity-50 disabled:bg-zinc-800">
-                  Spiel starten
-                </button>
-                <p id="lobbyStartHint" class="mt-3 text-sm font-medium text-zinc-500">Mindestens 3 Spieler benötigt</p>
+              <div class="w-full max-w-sm">
+                <button id="lobbyStartBtn" class="w-full rounded-xl px-6 py-4 bg-brand text-white font-bold text-xl hover:bg-brandHover disabled:opacity-50">Spiel starten</button>
               </div>
-              <button id="lobbyLeaveBtn" class="mt-6 text-sm font-bold text-zinc-500 hover:text-white transition-colors">
-                Lobby verlassen
-              </button>
+              <button id="lobbyLeaveBtn" class="mt-6 text-sm font-bold text-zinc-500 hover:text-white">Verlassen</button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ========================================== -->
-      <!-- VIEW 3: GAME ARENA                         -->
-      <!-- ========================================== -->
+      <!-- GAME -->
       <section id="gameView" class="hidden animate-fade-in">
         <div class="grid lg:grid-cols-[1fr_360px] gap-6 max-w-7xl mx-auto">
           
-          <!-- Main game area -->
           <div class="space-y-6">
-            
-            <!-- Header bar -->
             <div class="panel p-5 flex flex-wrap items-center justify-between gap-4">
               <div class="flex items-center gap-6">
-                <div>
-                  <div class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Raum</div>
-                  <div class="text-xl font-black font-mono text-white" id="roomCodeDisplay">----</div>
-                </div>
+                <div><div class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Raum</div><div class="text-xl font-black font-mono text-white" id="roomCodeDisplay">----</div></div>
                 <div class="w-px h-8 bg-zinc-800"></div>
-                <div>
-                  <div class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Runde</div>
-                  <div class="text-xl font-black text-white" id="roundDisplay">1</div>
-                </div>
+                <div><div class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Runde</div><div class="text-xl font-black text-white" id="roundDisplay">1</div></div>
               </div>
               <div class="flex flex-wrap gap-2">
-                <button id="inviteBtn" class="px-4 py-2 bg-zinc-800 text-sm font-semibold rounded-lg hover:bg-zinc-700">Link</button>
                 <button id="startBtn" class="hidden px-4 py-2 bg-brand text-white text-sm font-bold rounded-lg hover:bg-brandHover">Starten</button>
                 <button id="playAgainBtn" class="hidden px-4 py-2 bg-white text-black text-sm font-bold rounded-lg hover:bg-zinc-200">Nochmal</button>
                 <button id="leaveGameBtn" class="px-4 py-2 text-zinc-500 text-sm font-bold rounded-lg hover:text-white">Verlassen</button>
               </div>
             </div>
 
-            <!-- Canvas Area -->
             <div class="panel p-2">
               <div class="px-4 pt-3 pb-4">
                 <div class="flex items-center justify-between mb-2">
@@ -241,8 +124,13 @@
               </div>
               
               <div class="relative rounded-[1rem] overflow-hidden border border-zinc-800 bg-[#09090b]">
+                <!-- Sabotage Notification Overlay -->
+                <div id="sabotageOverlay" class="hidden absolute inset-0 z-20 flex items-center justify-center bg-rose-950/60 backdrop-blur-sm">
+                  <h1 class="text-4xl md:text-6xl font-black text-rose-500 tracking-widest uppercase animate-shake">Sabotage!</h1>
+                </div>
+                
                 <canvas id="gameCanvas" class="w-full h-[450px] md:h-[600px] block"></canvas>
-                <!-- Waiting overlay -->
+                
                 <div id="canvasOverlay" class="absolute inset-0 flex items-center justify-center bg-[#09090b]/80 backdrop-blur-sm pointer-events-none">
                   <p id="canvasOverlayText" class="text-white font-bold text-xl tracking-wide"></p>
                 </div>
@@ -255,55 +143,46 @@
             </div>
           </div>
 
-          <!-- Sidebar -->
           <aside class="space-y-6">
             
-            <!-- Role Panel -->
             <div class="panel p-6">
               <h2 class="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-4">Deine Rolle</h2>
+              
+              <div id="artistWarning" class="hidden mb-4 px-4 py-3 bg-brand/20 border border-brand/50 rounded-xl">
+                <p class="text-xs text-brand font-bold uppercase">Artist Tipp</p>
+                <p class="text-sm text-brand font-medium mt-1">Zeichne kryptisch! Wenn der Imposter das Wort im Showdown errät, verliert ihr!</p>
+              </div>
+
               <div class="space-y-3">
                 <div class="flex justify-between items-center bg-zinc-950 px-4 py-3 rounded-xl border border-zinc-800">
-                  <span class="text-zinc-400 font-medium text-sm">Kategorie</span>
-                  <span id="categoryText" class="text-white font-bold">-</span>
+                  <span class="text-zinc-400 font-medium text-sm">Kategorie</span><span id="categoryText" class="text-white font-bold">-</span>
                 </div>
                 <div class="flex justify-between items-center bg-zinc-950 px-4 py-3 rounded-xl border border-zinc-800">
-                  <span class="text-zinc-400 font-medium text-sm">Wort</span>
-                  <span id="wordText" class="text-white font-bold">-</span>
+                  <span class="text-zinc-400 font-medium text-sm">Wort</span><span id="wordText" class="text-white font-bold">-</span>
                 </div>
-                <div id="imposterBadge" class="hidden mt-3 px-4 py-3 rounded-xl bg-rose-500 text-white font-black text-center tracking-wide uppercase text-sm">
-                  Du bist der Imposter
-                </div>
+                <div id="imposterBadge" class="hidden mt-3 px-4 py-3 rounded-xl bg-rose-500 text-white font-black text-center tracking-wide uppercase text-sm">Du bist der Imposter</div>
+                <button id="sabotageBtn" class="hidden w-full mt-3 px-4 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold uppercase text-sm transition-colors disabled:opacity-50 disabled:bg-zinc-800">
+                  Sabotage auslösen (1x)
+                </button>
               </div>
 
-              <!-- Hints -->
-              <div id="imposterHintsPanel" class="hidden mt-6">
-                <div class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Hinweise</div>
-                <div id="imposterHintsList" class="space-y-2"></div>
+              <div id="optionsPanel" class="hidden mt-6">
+                <div class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Wort-Auswahl (Mind-Game)</div>
+                <div id="optionsList" class="grid grid-cols-2 gap-2"></div>
               </div>
             </div>
 
-            <!-- Players Panel -->
-            <div class="panel p-6">
-              <h2 class="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-4">Spieler</h2>
-              <div id="playersList" class="space-y-2"></div>
-            </div>
+            <div class="panel p-6"><h2 class="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-4">Spieler</h2><div id="playersList" class="space-y-2"></div></div>
 
-            <!-- Voting Panel -->
             <div id="votePanel" class="panel p-6 hidden bg-zinc-800 border-zinc-600">
               <h2 class="text-sm font-bold uppercase tracking-widest text-white mb-4">Voting Phase</h2>
               <div id="voteCards" class="grid gap-2"></div>
             </div>
 
-            <!-- Showdown Panel -->
             <div id="showdownPanel" class="panel p-6 hidden border-brand">
               <h2 class="text-sm font-bold uppercase tracking-widest text-brand mb-2">Showdown</h2>
               <p id="showdownText" class="text-white font-medium mb-5"></p>
-              <div id="guessWrap" class="hidden space-y-3">
-                <input id="guessInput" class="w-full rounded-xl px-4 py-3 text-white placeholder-zinc-600" placeholder="Geheimes Wort eingeben" />
-                <button id="submitGuessBtn" class="w-full rounded-xl px-4 py-3 bg-brand text-white font-bold hover:bg-brandHover">
-                  Wort erraten
-                </button>
-              </div>
+              <div id="showdownOptions" class="grid grid-cols-1 gap-2 hidden"></div>
             </div>
 
           </aside>
