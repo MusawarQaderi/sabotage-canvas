@@ -226,10 +226,21 @@ function getPointerNorm(event) {
   };
 }
 
+// Variable für das Throttling im globalen Scope hinzufügen (z.B. oben unter appState)
+let lastDrawEmit = 0;
+
 function sendPoint(event, isNewStroke) {
+  const now = Date.now();
+  
+  // Drosselung (Throttling): Bei fortlaufendem Strich max. alle 20ms an den Server senden
+  if (!isNewStroke && now - lastDrawEmit < 20) return;
+  lastDrawEmit = now;
+
   const { x, y } = getPointerNorm(event);
   socket.emit('drawPoint', { x, y, isNewStroke });
-  playPop();
+  
+  // Audio optional auch drosseln, damit es sich bei schnellen Bewegungen nicht überschlägt
+  if (isNewStroke) playPop();
 }
 
 function startTimer(mode, endsAt, totalMs, label) {
