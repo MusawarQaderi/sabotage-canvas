@@ -10,7 +10,6 @@ const MAX_PLAYERS = 8;
 const DRAW_TURN_MS = 3000;
 const VOTING_MS = 30000;
 const SHOWDOWN_MS = 15000;
-
 const COLORS = ['#06b6d4', '#f43f5e', '#10b981', '#f59e0b', '#a855f7', '#22d3ee', '#fb7185', '#34d399'];
 
 const app = express();
@@ -21,6 +20,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = new Map();
 const playerRoom = new Map();
+
+// --- Hilfsfunktionen ---
 
 function sanitizeNickname(input) {
   const value = String(input || '').trim().replace(/\s+/g, ' ');
@@ -33,6 +34,26 @@ function normalizeGuess(input) {
     .trim()
     .toLocaleLowerCase('de-DE')
     .replace(/\s+/g, ' ');
+}
+
+// Berechnet die Anzahl der abweichenden Buchstaben (Levenshtein-Distanz)
+function levenshtein(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[a.length][b.length];
 }
 
 function randomInt(max) {
@@ -161,6 +182,8 @@ function recalcVoteCounts(room) {
   }
   room.voteCounts = counts;
 }
+
+// --- Spielphasen-Steuerung ---
 
 function beginVoting(room) {
   clearTimers(room);
@@ -335,6 +358,7 @@ function removePlayer(room, socketId) {
   const removedTurnOrderIndex = (room.turnOrder || []).indexOf(socketId);
   delete room.votes[socketId];
   recalcVoteCounts(room);
+  
   if (wasHost && room.players.length) {
     room.hostId = room.players[0].id;
   }
@@ -378,6 +402,8 @@ function removePlayer(room, socketId) {
   }
   emitRoomState(room);
 }
+
+// --- Socket Events ---
 
 io.on('connection', (socket) => {
   socket.on('createRoom', ({ nickname }) => {
@@ -525,9 +551,15 @@ io.on('connection', (socket) => {
   socket.on('submitImposterGuess', ({ guess }) => {
     const room = findRoomBySocketId(socket.id);
     if (!room || room.phase !== 'showdown' || socket.id !== room.imposterId) return;
+    
     const submitted = normalizeGuess(guess);
     const solution = normalizeGuess(room.word);
-    if (submitted && submitted === solution) {
+    
+    // Fuzzy Search: 20% Tippfehler-Toleranz erlauben
+    const distance = levenshtein(submitted, solution);
+    const maxErrors = Math.floor(solution.length * 0.20); 
+
+    if (submitted && distance <= maxErrors) {
       finishGame(room, 'heist_win');
       return;
     }
